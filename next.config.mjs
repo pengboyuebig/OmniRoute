@@ -111,52 +111,46 @@ const nextConfig = {
     NEXT_PUBLIC_OMNIROUTE_BASE_PATH: normalizeBasePath(process.env.OMNIROUTE_BASE_PATH),
   },
   distDir,
-  // Turbopack config: redirect native modules to stubs at build time
-  turbopack: {
-    root: projectRoot,
-    resolveAlias: {
-      // @/mitm/manager → stub ONLY where the runtime can't run the MITM stack
-      // (Docker sets OMNIROUTE_MITM_STUB=1 — #3390 graceful degradation). The
-      // alias used to be unconditional, which was fine while Docker was the
-      // only Turbopack consumer — but the v3.8.45 bundler-default flip shipped
-      // the stub to every npm/Electron/VPS artifact and broke Agent Bridge
-      // start for all non-Docker users (#6344). See scripts/build/mitm-stub-flag.mjs.
-      ...mitmManagerAliasFor(process.env),
-      ...minimalBuildAliases,
-    },
-    // src/lib/agentSkills/generator.ts builds its fs base path from a runtime
-    // `outputDir` parameter (`path.join(process.cwd(), outputDir)`), which is
-    // NOT a compile-time literal, so Turbopack's build-time file-tracing
-    // analyzer can't statically narrow the several dynamic readdirSync/rmSync/
-    // readFileSync/writeFileSync call sites a few lines below and falls back
-    // to an "Overly broad patterns... matches N files" warning — once per
-    // Next.js entry point that imports the module (/api/agent-skills/generate,
-    // /api/cli-tools/pi-settings). The fs access is legitimate and bounded
-    // (skills/<id>/SKILL.md, ~48 known IDs), so this is a known-benign,
-    // expected diagnostic — suppress it here rather than fight the analyzer,
-    // mirroring the isNextIntlExtractorDynamicImportWarning precedent below
-    // for the webpack path. (#6582)
-    // open-sse/services/compression/ruleLoader.ts and
-    // .../engines/rtk/filterLoader.ts both define an identical
-    // getModuleDir() helper that walks up directories via
-    // path.resolve(anchor) + fs.existsSync(...) in a loop with a
-    // non-literal argument — the same dynamic-path fs access pattern as
-    // the agentSkills case above, but not covered by that narrower
-    // allowlist glob, so the "Overly broad patterns..." warning kept
-    // firing (610 times, once per entry point transitively importing the
-    // compression module). Same known-benign, bounded fs access;
-    // suppressed here rather than fought. (#7051, follow-up to #6582)
-    ignoreIssue: [
-      {
-        path: "**/src/lib/agentSkills/**",
-        description: /Overly broad patterns can lead to build performance issues/,
-      },
-      {
-        path: "**/open-sse/services/compression/**",
-        description: /Overly broad patterns can lead to build performance issues/,
-      },
-    ],
-  },
+  // Turbopack disabled on Windows due to lightningcss native binary failure (0xc0000142)
+  // turbopack: {
+  //   root: projectRoot,
+  //   resolveAlias: {
+  //     ...mitmManagerAliasFor(process.env),
+  //     ...minimalBuildAliases,
+  //   },
+  //   // src/lib/agentSkills/generator.ts builds its fs base path from a runtime
+  //   // `outputDir` parameter (`path.join(process.cwd(), outputDir)`), which is
+  //   // NOT a compile-time literal, so Turbopack's build-time file-tracing
+  //   // analyzer can't statically narrow the several dynamic readdirSync/rmSync/
+  //   // readFileSync/writeFileSync call sites a few lines below and falls back
+  //   // to an "Overly broad patterns... matches N files" warning — once per
+  //   // Next.js entry point that imports the module (/api/agent-skills/generate,
+  //   // /api/cli-tools/pi-settings). The fs access is legitimate and bounded
+  //   // (skills/<id>/SKILL.md, ~48 known IDs), so this is a known-benign,
+  //   // expected diagnostic — suppress it here rather than fight the analyzer,
+  //   // mirroring the isNextIntlExtractorDynamicImportWarning precedent below
+  //   // for the webpack path. (#6582)
+  //   // open-sse/services/compression/ruleLoader.ts and
+  //   // .../engines/rtk/filterLoader.ts both define an identical
+  //   // getModuleDir() helper that walks up directories via
+  //   // path.resolve(anchor) + fs.existsSync(...) in a loop with a
+  //   // non-literal argument — the same dynamic-path fs access pattern as
+  //   // the agentSkills case above, but not covered by that narrower
+  //   // allowlist glob, so the "Overly broad patterns..." warning kept
+  //   // firing (610 times, once per entry point transitively importing the
+  //   // compression module). Same known-benign, bounded fs access;
+  //   // suppressed here rather than fought. (#7051, follow-up to #6582)
+  //   ignoreIssue: [
+  //     {
+  //       path: "**/src/lib/agentSkills/**",
+  //       description: /Overly broad patterns can lead to build performance issues/,
+  //     },
+  //     {
+  //       path: "**/open-sse/services/compression/**",
+  //       description: /Overly broad patterns can lead to build performance issues/,
+  //     },
+  //   ],
+  // },
   output: "standalone",
   compress: true,
   productionBrowserSourceMaps: false,
