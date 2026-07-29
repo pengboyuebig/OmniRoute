@@ -40,9 +40,8 @@ export const APP_STAGING_ALLOWED_EXACT_PATHS: string[] = [
   // published 3.8.47 crashed with ERR_MODULE_NOT_FOUND (same class as tls-options/3.8.41).
   "head-response-guard.cjs",
   "http-method-guard.cjs",
-  "open-sse/mcp-server/server.js",
   // LLMLingua ONNX worker — esbuild'd standalone .js spawned via worker_threads
-  // (the Next.js bundler can't trace the computed Worker path). Kept like the MCP server.
+  // (the Next.js bundler can't trace the computed Worker path).
   "open-sse/services/compression/engines/llmlingua/onnxWorker.js",
   "package.json",
   "peer-stamp.mjs",
@@ -92,7 +91,6 @@ export const PACK_ARTIFACT_ROOT_ALLOWED_EXACT_PATHS: string[] = [
   // `data:text/javascript,...` URL dynamically). Loaded via pathToFileURL() at
   // runtime; shipped via package.json "files", so it must be allowed here.
   "bin/aliasResolverHook.mjs",
-  "bin/mcp-server.mjs",
   "bin/nodeRuntimeSupport.mjs",
   "bin/omniroute.mjs",
   "bin/reset-password.mjs",
@@ -106,13 +104,6 @@ export const PACK_ARTIFACT_ROOT_ALLOWED_EXACT_PATHS: string[] = [
   "bin/restore-policies.sh",
   "bin/rollback.sh",
   "bin/snapshot-data.sh",
-  "open-sse/mcp-server/README.md",
-  "open-sse/mcp-server/audit.ts",
-  "open-sse/mcp-server/httpTransport.ts",
-  "open-sse/mcp-server/index.ts",
-  "open-sse/mcp-server/runtimeHeartbeat.ts",
-  "open-sse/mcp-server/scopeEnforcement.ts",
-  "open-sse/mcp-server/server.ts",
   // Runtime polyfill eagerly imported by bin/omniroute.mjs (Node <22 compat);
   // shipped via package.json "files", so it must be allowed in the tarball.
   "open-sse/utils/setupPolyfill.ts",
@@ -179,7 +170,6 @@ export const PACK_ARTIFACT_REQUIRED_PATHS: string[] = [
   "bin/cli/utils/ensureAndroidCacheDir.mjs",
   "bin/cli/utils/storageKeyProvision.mjs",
   "bin/cli/utils/versionFastPath.mjs",
-  "bin/mcp-server.mjs",
   "bin/nodeRuntimeSupport.mjs",
   "bin/omniroute.mjs",
   // #7808: aliasResolver + its hook file. bin/omniroute.mjs imports

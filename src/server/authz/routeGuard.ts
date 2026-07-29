@@ -42,8 +42,6 @@ export const LOCAL_ONLY_API_PREFIXES: ReadonlyArray<string> = [
   "/api/tools/agent-bridge/", // AgentBridge: spawns MITM server + DNS edits (Hard Rules #15 + #17)
   "/api/tools/traffic-inspector/", // Traffic Inspector: http-proxy listener + system proxy (Hard Rules #15 + #17)
   "/api/issue-agent/", // Issue Agent: recorded/local triage executor surface; keep loopback/LAN until sandbox + audit hardening is complete
-  "/api/plugins/", // plugins: load/execute via worker_threads + child_process (Hard Rules #15 + #17)
-  "/api/plugins", // bare path: GET list + POST install also trigger plugin loading
   "/api/middleware/", // SECURITY_AUDIT M8: middleware hooks compile+run arbitrary JS via new vm.Script (src/lib/middleware/registry.ts) on the request hot path — same code-exec class as /api/plugins/, so loopback-gate it for parity (Hard Rules #15 + #17)
   "/api/system/version", // auto-update: spawns git checkout + npm install — RCE-via-tunnel surface (Hard Rules #15 + #17, found by 6A.8 route-guard gate)
   "/api/db-backups/exportAll", // spawns tar for export archive (Hard Rules #15 + #17, found by 6A.8 route-guard gate)
@@ -90,7 +88,7 @@ export { SPAWN_CAPABLE_PREFIXES };
  * consult this constant — it reads `getAuthzBypassSnapshot().prefixes`,
  * which is hot-reloaded on every settings PATCH.
  */
-export const LOCAL_ONLY_MANAGE_SCOPE_BYPASS_PREFIXES: ReadonlyArray<string> = ["/api/mcp/"];
+export const LOCAL_ONLY_MANAGE_SCOPE_BYPASS_PREFIXES: ReadonlyArray<string> = [];
 
 export const ALWAYS_PROTECTED_API_PATHS: ReadonlyArray<string> = [
   "/api/shutdown",
@@ -174,9 +172,7 @@ export function isPrivateLanHost(hostHeader: string | null): boolean {
  *   triggers the auto-update flow (spawns git checkout + npm install + pm2).
  *   Hard Rules #15/#17 still apply to POST.
  */
-export const LOCAL_ONLY_API_GET_EXEMPTIONS: ReadonlySet<string> = new Set([
-  "/api/system/version",
-]);
+export const LOCAL_ONLY_API_GET_EXEMPTIONS: ReadonlySet<string> = new Set(["/api/system/version"]);
 
 /** Safe HTTP methods that can be exempted for read-only paths. */
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);

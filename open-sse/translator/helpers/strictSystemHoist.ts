@@ -1,13 +1,23 @@
-import { systemMessageMustBeFirst } from "../../../src/lib/memory/injection.ts";
-
 type Message = { role: string; content: unknown; [key: string]: unknown };
+
+// #6135: providers that accept a system-role message only at index 0 (later
+// positions are rejected with HTTP 400). Add providers here only when they are
+// documented as strict.
+const PROVIDERS_SYSTEM_MUST_BE_FIRST = new Set(["xiaomi-mimo", "mimo"]);
+
+function systemMessageMustBeFirst(provider: string | null | undefined): boolean {
+  if (!provider) return false;
+  return PROVIDERS_SYSTEM_MUST_BE_FIRST.has(provider.toLowerCase().trim());
+}
 
 function toTextContent(content: unknown): string {
   if (typeof content === "string") return content;
   if (Array.isArray(content)) {
     return content
       .filter((part): part is { type: string; text?: unknown } => {
-        return Boolean(part) && typeof part === "object" && (part as { type?: unknown }).type === "text";
+        return (
+          Boolean(part) && typeof part === "object" && (part as { type?: unknown }).type === "text"
+        );
       })
       .map((part) => String(part.text ?? ""))
       .join("\n");

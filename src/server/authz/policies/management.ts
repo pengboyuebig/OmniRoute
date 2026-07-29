@@ -7,7 +7,6 @@ import { allow, reject } from "../context";
 import { extractApiKey, isValidApiKey } from "../../../sse/services/auth";
 import { getApiKeyMetadata } from "../../../lib/db/apiKeys";
 import { hasManageScope } from "../../../lib/api/requireManagementAuth";
-import { hasMcpConnectOrManageScope, MCP_CONNECT_SCOPE } from "../../../shared/constants/managementScopes";
 import { evaluateAccessTokenAuth } from "../accessTokenAuth";
 import { CLI_TOKEN_HEADER, PEER_IP_HEADER, VIA_PROXY_HEADER } from "../headers";
 import { resolveStampedPeer, resolveStampedViaProxy } from "../peerStamp";
@@ -134,10 +133,10 @@ export const managementPolicy: RoutePolicy = {
     // LOCAL_ONLY_MANAGE_SCOPE_BYPASS_PREFIXES) is reachable from non-loopback
     // when the caller presents EITHER (a) a valid API key with the `manage`
     // scope, or (b) an authenticated dashboard session. This lets:
-    //   - headless / remote MCP clients drive the management surface with a
+    //   - headless / remote clients drive the management surface with a
     //     manage-scope Bearer key, and
-    //   - the Dashboard UI itself (cookie session) render its MCP pages
-    //     (/api/mcp/status, /api/mcp/tools) from a public hostname.
+    //   - the Dashboard UI itself (cookie session) render its pages from a
+    //     public hostname.
     //
     // The strict-loopback default still applies to everything else (notably
     // the subprocess-spawning /api/cli-tools/runtime/* surface, which is NOT
@@ -145,7 +144,11 @@ export const managementPolicy: RoutePolicy = {
     //
     // Anonymous (no Bearer / invalid key / wrong scope / no session) requests
     // still hit the same 403 LOCAL_ONLY they did before.
-    if (isLocalOnlyPath(path, ctx.request?.method) && !isLoopbackRequest(ctx) && !isPrivateLanRequest(ctx)) {
+    if (
+      isLocalOnlyPath(path, ctx.request?.method) &&
+      !isLoopbackRequest(ctx) &&
+      !isPrivateLanRequest(ctx)
+    ) {
       if (isLocalOnlyBypassableByManageScope(path)) {
         // Management auth is header-only — a URL-borne token must never satisfy a
         // manage-scope bypass of a LOCAL_ONLY route. See #3300 follow-up.
@@ -154,26 +157,9 @@ export const managementPolicy: RoutePolicy = {
           try {
             if (await isValidApiKey(apiKey)) {
               const meta = await getApiKeyMetadata(apiKey);
-              // #7895: the `/api/mcp/` carve-out ALSO accepts the narrow
-              // `mcp:connect` scope, so remote MCP-only callers don't need
-              // broad `manage`/`admin` just to reach the transport routes.
-              // Scoped to `/api/mcp/` ONLY — every other LOCAL_ONLY bypass
-              // prefix still requires full `hasManageScope` (below).
-              const scopeGranted =
-                path.startsWith("/api/mcp/") && meta
-                  ? hasMcpConnectOrManageScope(meta.scopes)
-                  : Boolean(meta && hasManageScope(meta.scopes));
+              const scopeGranted = Boolean(meta && hasManageScope(meta.scopes));
               if (meta && scopeGranted) {
-                // Distinguish admin vs manage vs the narrow mcp:connect scope in
-                // the audit label so log review can tell which privilege
-                // actually granted the bypass.
-                const grantedBy = meta.scopes.includes("admin")
-                  ? "admin"
-                  : meta.scopes.includes("manage")
-                    ? "manage"
-                    : meta.scopes.includes(MCP_CONNECT_SCOPE)
-                      ? "mcp-connect"
-                      : "manage";
+                const grantedBy = meta.scopes.includes("admin") ? "admin" : "manage";
                 return allow({
                   kind: "management_key",
                   id: meta.id,
@@ -192,9 +178,9 @@ export const managementPolicy: RoutePolicy = {
           }
         }
         // Dashboard session bypass: the Dashboard UI itself needs to render
-        // /api/mcp/status, /api/mcp/tools, etc. from a public hostname. Cookie
-        // auth is already proof of an authenticated admin — same trust level
-        // as a manage-scope Bearer for the surface in scope here.
+        // management pages from a public hostname. Cookie auth is already
+        // proof of an authenticated admin — same trust level as a manage-scope
+        // Bearer for the surface in scope here.
         try {
           if (await isDashboardSessionAuthenticated(ctx.request)) {
             return allow({

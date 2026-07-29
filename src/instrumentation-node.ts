@@ -570,16 +570,6 @@ export async function registerNodejs(): Promise<void> {
           console.warn("[STARTUP] context-window reconcile failed to start (non-fatal):", msg);
         }),
 
-      // TV6 typed memory decay: optional periodic sweep of decayed episodic memories.
-      // Doubly opt-in (no-op unless MEMORY_TYPED_DECAY_ENABLED=true AND
-      // MEMORY_TYPED_DECAY_SWEEP_INTERVAL>0). Never deletes by default. Never fatal.
-      import("@/lib/memory/typedDecay")
-        .then((m) => m.startMemoryDecaySweep())
-        .catch((err: unknown) => {
-          const msg = err instanceof Error ? err.message : String(err);
-          console.warn("[STARTUP] memory decay sweep failed to start (non-fatal):", msg);
-        }),
-
       // Backup schedule (#8513): execute `backup-schedule.json` cron server-side.
       // Reads the schedule written by `omniroute backup auto enable` and fires
       // `runBackupCommand` when the cron expression matches. Self-gated: no-op

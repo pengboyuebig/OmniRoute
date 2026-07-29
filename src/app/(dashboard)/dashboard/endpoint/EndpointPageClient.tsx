@@ -1,83 +1,19 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import Link from "next/link";
-import { Card, Button, Input, Modal, CardSkeleton, SegmentedControl } from "@/shared/components";
+import { Card, Button, Input, Modal, CardSkeleton } from "@/shared/components";
 import Toggle from "@/shared/components/Toggle";
 import { useCopyToClipboard } from "@/shared/hooks/useCopyToClipboard";
 import { isPublicDisplayBaseUrl, useDisplayBaseUrl } from "@/shared/hooks";
 import { AI_PROVIDERS, getProviderByAlias } from "@/shared/constants/providers";
 import { getProviderDisplayName } from "@/lib/display/names";
 import { useTranslations } from "next-intl";
-import A2ADashboardPage from "./components/A2ADashboard";
-import McpDashboardPage from "./components/MCPDashboard";
-import NotionSourceCard from "./components/NotionSourceCard";
-import ObsidianSourceCard from "./components/ObsidianSourceCard";
 import VscodeTokenAliasCard from "./VscodeTokenAliasCard";
 
 const BUILD_TIME_CLOUD_URL = process.env.NEXT_PUBLIC_CLOUD_URL || null;
 const CLOUD_ACTION_TIMEOUT_MS = 15000;
 
 type TranslationValues = Record<string, string | number | boolean | Date>;
-type CloudflaredTunnelPhase =
-  "unsupported" | "not_installed" | "stopped" | "starting" | "running" | "error";
-
-type CloudflaredTunnelStatus = {
-  supported: boolean;
-  installed: boolean;
-  managedInstall: boolean;
-  installSource: string | null;
-  binaryPath: string | null;
-  running: boolean;
-  pid: number | null;
-  publicUrl: string | null;
-  apiUrl: string | null;
-  targetUrl: string;
-  phase: CloudflaredTunnelPhase;
-  lastError: string | null;
-  logPath: string;
-};
-
-type TailscaleTunnelPhase =
-  "unsupported" | "not_installed" | "needs_login" | "stopped" | "running" | "error";
-
-type TailscaleTunnelStatus = {
-  supported: boolean;
-  installed: boolean;
-  managedInstall: boolean;
-  installSource: string | null;
-  binaryPath: string | null;
-  loggedIn: boolean;
-  daemonRunning: boolean;
-  running: boolean;
-  enabled: boolean;
-  tunnelUrl: string | null;
-  apiUrl: string | null;
-  phase: TailscaleTunnelPhase;
-  platform: string;
-  brewAvailable: boolean;
-  lastError: string | null;
-  pid: number | null;
-};
-
-type NgrokTunnelPhase =
-  "unsupported" | "not_installed" | "stopped" | "needs_auth" | "starting" | "running" | "error";
-
-type NgrokTunnelStatus = {
-  supported: boolean;
-  installed: boolean;
-  running: boolean;
-  publicUrl: string | null;
-  apiUrl: string | null;
-  targetUrl: string;
-  phase: NgrokTunnelPhase;
-  lastError: string | null;
-};
-
-type TunnelNotice = {
-  type: "success" | "error" | "info";
-  message: string;
-};
 
 type APIPageClientProps = {
   machineId: string;
@@ -101,27 +37,6 @@ type EndpointModelSummary = {
 };
 
 type CopyHandler = (text: string, key?: string) => void | Promise<void>;
-
-type EndpointTunnelVisibility = {
-  showCloudflaredTunnel: boolean;
-  showTailscaleFunnel: boolean;
-  showNgrokTunnel: boolean;
-};
-
-type EndpointTab = "apis" | "mcp" | "a2a" | "context-sources";
-
-const ENDPOINT_TABS: Array<{ value: EndpointTab; labelKey: string; icon: string }> = [
-  { value: "apis", labelKey: "tabApis", icon: "api" },
-  { value: "mcp", labelKey: "tabMcp", icon: "extension" },
-  { value: "a2a", labelKey: "tabA2a", icon: "hub" },
-  { value: "context-sources", labelKey: "tabContextSources", icon: "database" },
-];
-
-const DEFAULT_TUNNEL_VISIBILITY: EndpointTunnelVisibility = {
-  showCloudflaredTunnel: true,
-  showTailscaleFunnel: true,
-  showNgrokTunnel: true,
-};
 
 function runEndpointBackgroundTask(taskName: string, task: () => Promise<unknown>) {
   void task().catch((error) => {
@@ -151,31 +66,9 @@ export default function APIPageClient({ machineId }: Readonly<APIPageClientProps
   const [selectedProvider, setSelectedProvider] = useState(null); // for provider models popup
   const [cloudBaseUrl, setCloudBaseUrl] = useState(BUILD_TIME_CLOUD_URL); // dynamic cloud URL from API response
   const [cloudConfigured, setCloudConfigured] = useState(Boolean(BUILD_TIME_CLOUD_URL));
-  const [mcpStatus, setMcpStatus] = useState<any>(null);
-  const [a2aStatus, setA2aStatus] = useState<any>(null);
   const [searchProviders, setSearchProviders] = useState<any[]>([]);
-  const [cloudflaredStatus, setCloudflaredStatus] = useState<CloudflaredTunnelStatus | null>(null);
-  const [cloudflaredBusy, setCloudflaredBusy] = useState(false);
-  const [cloudflaredNotice, setCloudflaredNotice] = useState<TunnelNotice | null>(null);
-  const [tailscaleStatus, setTailscaleStatus] = useState<TailscaleTunnelStatus | null>(null);
-  const [tailscaleBusy, setTailscaleBusy] = useState(false);
-  const [tailscaleNotice, setTailscaleNotice] = useState<TunnelNotice | null>(null);
-  const [showTailscaleInstallModal, setShowTailscaleInstallModal] = useState(false);
-  const [tailscaleInstallBusy, setTailscaleInstallBusy] = useState(false);
-  const [tailscaleInstallLog, setTailscaleInstallLog] = useState<string[]>([]);
-  const [tailscalePassword, setTailscalePassword] = useState("");
-  const [showCloudflaredTunnel, setShowCloudflaredTunnel] = useState(true);
-  const [showTailscaleFunnel, setShowTailscaleFunnel] = useState(true);
-  const [ngrokStatus, setNgrokStatus] = useState<NgrokTunnelStatus | null>(null);
-  const [ngrokBusy, setNgrokBusy] = useState(false);
-  const [ngrokNotice, setNgrokNotice] = useState<TunnelNotice | null>(null);
-  const [ngrokToken, setNgrokToken] = useState("");
-  const [showNgrokTunnel, setShowNgrokTunnel] = useState(true);
-  const [expandedTunnel, setExpandedTunnel] = useState<string | null>(null);
   const [localApiUrl, setLocalApiUrl] = useState("http://localhost:20128/v1");
   const [lanUrls, setLanUrls] = useState<string[]>([]);
-  const [tailscaleIpUrl, setTailscaleIpUrl] = useState<string | null>(null);
-  const [activeEndpointTab, setActiveEndpointTab] = useState<EndpointTab>("apis");
   const [customSystemPromptEnabled, setCustomSystemPromptEnabled] = useState(false);
   const [customSystemPrompt, setCustomSystemPrompt] = useState("");
 
@@ -208,112 +101,16 @@ export default function APIPageClient({ machineId }: Readonly<APIPageClientProps
     }
   };
 
-  const fetchCloudflaredStatus = useCallback(
-    async (silent = false) => {
-      try {
-        const res = await fetch("/api/tunnels/cloudflared", { cache: "no-store" });
-        const data = await res.json().catch(() => null);
-        if (!res.ok) {
-          throw new Error(
-            data?.error ||
-              translateOrFallback(
-                "cloudflaredRequestFailed",
-                "Failed to load Cloudflare tunnel status"
-              )
-          );
-        }
-
-        setCloudflaredStatus(data);
-        return data as CloudflaredTunnelStatus;
-      } catch (error) {
-        if (!silent) {
-          setCloudflaredNotice({
-            type: "error",
-            message:
-              error instanceof Error
-                ? error.message
-                : translateOrFallback(
-                    "cloudflaredRequestFailed",
-                    "Failed to load Cloudflare tunnel status"
-                  ),
-          });
-        }
-        return null;
-      }
-    },
-    [translateOrFallback]
-  );
-
-  const fetchTailscaleStatus = useCallback(
-    async (silent = false) => {
-      try {
-        const res = await fetch("/api/tunnels/tailscale", { cache: "no-store" });
-        const data = await res.json().catch(() => null);
-        if (!res.ok) {
-          throw new Error(
-            data?.error ||
-              translateOrFallback("tailscaleRequestFailed", "Failed to load Tailscale status")
-          );
-        }
-
-        setTailscaleStatus(data);
-        return data as TailscaleTunnelStatus;
-      } catch (error) {
-        if (!silent) {
-          setTailscaleNotice({
-            type: "error",
-            message:
-              error instanceof Error
-                ? error.message
-                : translateOrFallback("tailscaleRequestFailed", "Failed to load Tailscale status"),
-          });
-        }
-        return null;
-      }
-    },
-    [translateOrFallback]
-  );
-
-  const fetchNgrokStatus = useCallback(
-    async (silent = false) => {
-      try {
-        const res = await fetch("/api/tunnels/ngrok", { cache: "no-store" });
-        const data = await res.json().catch(() => null);
-        if (!res.ok) {
-          throw new Error(
-            data?.error || translateOrFallback("ngrokRequestFailed", "Failed to load ngrok status")
-          );
-        }
-
-        setNgrokStatus(data);
-        return data as NgrokTunnelStatus;
-      } catch (error) {
-        if (!silent) {
-          setNgrokNotice({
-            type: "error",
-            message:
-              error instanceof Error
-                ? error.message
-                : translateOrFallback("ngrokRequestFailed", "Failed to load ngrok status"),
-          });
-        }
-        return null;
-      }
-    },
-    [translateOrFallback]
-  );
-
   useEffect(() => {
     let mounted = true;
 
     const loadPage = async () => {
-      const tunnelVisibility = await loadCloudSettings(() => mounted);
+      await loadCloudSettings(() => mounted);
 
       if (!mounted) return;
       setLoading(false);
 
       runEndpointBackgroundTask("models", fetchModels);
-      runEndpointBackgroundTask("protocol-status", fetchProtocolStatus);
       runEndpointBackgroundTask("search-providers", fetchSearchProviders);
       runEndpointBackgroundTask("network-info", async () => {
         try {
@@ -323,23 +120,12 @@ export default function APIPageClient({ machineId }: Readonly<APIPageClientProps
             if (mounted) {
               if (data.localUrl) setLocalApiUrl(data.localUrl);
               setLanUrls(data.lanUrls ?? []);
-              if (data.tailscaleIpUrl) setTailscaleIpUrl(data.tailscaleIpUrl);
             }
           }
         } catch {
           // non-critical
         }
       });
-
-      if (tunnelVisibility.showCloudflaredTunnel) {
-        runEndpointBackgroundTask("cloudflared-status", () => fetchCloudflaredStatus(true));
-      }
-      if (tunnelVisibility.showTailscaleFunnel) {
-        runEndpointBackgroundTask("tailscale-status", () => fetchTailscaleStatus(true));
-      }
-      if (tunnelVisibility.showNgrokTunnel) {
-        runEndpointBackgroundTask("ngrok-status", () => fetchNgrokStatus(true));
-      }
     };
 
     void loadPage();
@@ -347,7 +133,7 @@ export default function APIPageClient({ machineId }: Readonly<APIPageClientProps
     return () => {
       mounted = false;
     };
-  }, [fetchCloudflaredStatus, fetchTailscaleStatus, fetchNgrokStatus]);
+  }, []);
 
   const fetchModels = async () => {
     setModelsLoading(true);
@@ -361,24 +147,6 @@ export default function APIPageClient({ machineId }: Readonly<APIPageClientProps
       console.log("Error fetching models:", e);
     } finally {
       setModelsLoading(false);
-    }
-  };
-
-  const fetchProtocolStatus = async () => {
-    try {
-      const [mcpRes, a2aRes] = await Promise.allSettled([
-        fetch("/api/mcp/status"),
-        fetch("/api/a2a/status"),
-      ]);
-
-      if (mcpRes.status === "fulfilled" && mcpRes.value.ok) {
-        setMcpStatus(await mcpRes.value.json());
-      }
-      if (a2aRes.status === "fulfilled" && a2aRes.value.ok) {
-        setA2aStatus(await a2aRes.value.json());
-      }
-    } catch {
-      // Ignore status failures; protocols panel has fallback text.
     }
   };
 
@@ -455,21 +223,14 @@ export default function APIPageClient({ machineId }: Readonly<APIPageClientProps
     }
   };
 
-  const loadCloudSettings = async (
-    shouldApplyState: () => boolean = () => true
-  ): Promise<EndpointTunnelVisibility> => {
+  const loadCloudSettings = async (shouldApplyState: () => boolean = () => true) => {
     try {
       const res = await fetch("/api/settings");
       if (res.ok) {
         const data = await res.json();
-        const tunnelVisibility = {
-          showCloudflaredTunnel: data.hideEndpointCloudflaredTunnel !== true,
-          showTailscaleFunnel: data.hideEndpointTailscaleFunnel !== true,
-          showNgrokTunnel: data.hideEndpointNgrokTunnel !== true,
-        };
 
         if (!shouldApplyState()) {
-          return tunnelVisibility;
+          return;
         }
 
         setCloudEnabled(data.cloudEnabled || false);
@@ -482,33 +243,12 @@ export default function APIPageClient({ machineId }: Readonly<APIPageClientProps
         if (data.machineId) {
           setResolvedMachineId(data.machineId);
         }
-        setShowCloudflaredTunnel(tunnelVisibility.showCloudflaredTunnel);
-        setShowTailscaleFunnel(tunnelVisibility.showTailscaleFunnel);
-        setShowNgrokTunnel(tunnelVisibility.showNgrokTunnel);
-        if (data.ngrokAuthToken) setNgrokToken(data.ngrokAuthToken);
         setCustomSystemPromptEnabled(!!data.customSystemPromptEnabled);
         setCustomSystemPrompt(data.customSystemPrompt || "");
-
-        if (!tunnelVisibility.showCloudflaredTunnel) {
-          setCloudflaredStatus(null);
-          setCloudflaredNotice(null);
-        }
-        if (!tunnelVisibility.showTailscaleFunnel) {
-          setTailscaleStatus(null);
-          setTailscaleNotice(null);
-        }
-        if (!tunnelVisibility.showNgrokTunnel) {
-          setNgrokStatus(null);
-          setNgrokNotice(null);
-        }
-
-        return tunnelVisibility;
       }
     } catch (error) {
       console.log("Error loading cloud settings:", error);
     }
-
-    return DEFAULT_TUNNEL_VISIBILITY;
   };
 
   const handleCustomSystemPromptEnabledChange = (value: boolean) => {
@@ -551,50 +291,6 @@ export default function APIPageClient({ machineId }: Readonly<APIPageClientProps
       return () => clearTimeout(timer);
     }
   }, [cloudStatus]);
-
-  useEffect(() => {
-    if (cloudflaredNotice) {
-      const timer = setTimeout(() => setCloudflaredNotice(null), 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [cloudflaredNotice]);
-
-  useEffect(() => {
-    if (tailscaleNotice) {
-      const timer = setTimeout(() => setTailscaleNotice(null), 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [tailscaleNotice]);
-
-  useEffect(() => {
-    if (ngrokNotice) {
-      const timer = setTimeout(() => setNgrokNotice(null), 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [ngrokNotice]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      void fetchProtocolStatus();
-      if (showCloudflaredTunnel) {
-        void fetchCloudflaredStatus(true);
-      }
-      if (showTailscaleFunnel) {
-        void fetchTailscaleStatus(true);
-      }
-      if (showNgrokTunnel) {
-        void fetchNgrokStatus(true);
-      }
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [
-    fetchCloudflaredStatus,
-    fetchNgrokStatus,
-    fetchTailscaleStatus,
-    showCloudflaredTunnel,
-    showNgrokTunnel,
-    showTailscaleFunnel,
-  ]);
 
   const dispatchCloudChange = () => {
     globalThis.dispatchEvent(new Event("cloud-status-changed"));
@@ -690,382 +386,6 @@ export default function APIPageClient({ machineId }: Readonly<APIPageClientProps
     }
   };
 
-  const handleCloudflaredAction = async (action: "enable" | "disable") => {
-    setCloudflaredBusy(true);
-    setCloudflaredNotice(null);
-
-    try {
-      const res = await fetch("/api/tunnels/cloudflared", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
-      });
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        throw new Error(
-          data?.error ||
-            translateOrFallback("cloudflaredRequestFailed", "Failed to update Cloudflare tunnel")
-        );
-      }
-
-      if (data?.status) {
-        setCloudflaredStatus(data.status);
-      }
-
-      setCloudflaredNotice({
-        type: "success",
-        message:
-          action === "enable"
-            ? translateOrFallback("cloudflaredStarted", "Cloudflare tunnel started")
-            : translateOrFallback("cloudflaredStopped", "Cloudflare tunnel stopped"),
-      });
-    } catch (error) {
-      setCloudflaredNotice({
-        type: "error",
-        message:
-          error instanceof Error
-            ? error.message
-            : translateOrFallback("cloudflaredRequestFailed", "Failed to update Cloudflare tunnel"),
-      });
-    } finally {
-      setCloudflaredBusy(false);
-      await fetchCloudflaredStatus(true);
-    }
-  };
-
-  const handleNgrokAction = async (action: "enable" | "disable") => {
-    setNgrokBusy(true);
-    setNgrokNotice(null);
-
-    try {
-      const res = await fetch("/api/tunnels/ngrok", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, authToken: action === "enable" ? ngrokToken : undefined }),
-      });
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        throw new Error(
-          data?.error || translateOrFallback("ngrokRequestFailed", "Failed to update ngrok tunnel")
-        );
-      }
-
-      if (data?.status) {
-        setNgrokStatus(data.status);
-      }
-
-      setNgrokNotice({
-        type: "success",
-        message:
-          action === "enable"
-            ? translateOrFallback("ngrokStarted", "ngrok tunnel started")
-            : translateOrFallback("ngrokStopped", "ngrok tunnel stopped"),
-      });
-      if (action === "enable" && ngrokToken) {
-        await fetch("/api/settings", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ngrokAuthToken: ngrokToken }),
-        });
-      }
-    } catch (error) {
-      setNgrokNotice({
-        type: "error",
-        message:
-          error instanceof Error
-            ? error.message
-            : translateOrFallback("ngrokRequestFailed", "Failed to update ngrok tunnel"),
-      });
-    } finally {
-      setNgrokBusy(false);
-      await fetchNgrokStatus(true);
-    }
-  };
-
-  const waitForTailscale = useCallback(
-    async (
-      predicate: (status: TailscaleTunnelStatus) => boolean,
-      attempts = 40,
-      delayMs = 3000
-    ) => {
-      for (let attempt = 0; attempt < attempts; attempt += 1) {
-        await new Promise((resolve) => setTimeout(resolve, delayMs));
-        const status = await fetchTailscaleStatus(true);
-        if (status && predicate(status)) {
-          return status;
-        }
-      }
-      return null;
-    },
-    [fetchTailscaleStatus]
-  );
-
-  const requestTailscaleEnable = useCallback(async (payload: Record<string, unknown> = {}) => {
-    const res = await fetch("/api/tunnels/tailscale/enable", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json().catch(() => ({}));
-    return { res, data };
-  }, []);
-
-  const handleTailscaleEnable = useCallback(async () => {
-    setTailscaleBusy(true);
-    setTailscaleNotice(null);
-
-    try {
-      let { res, data } = await requestTailscaleEnable({
-        sudoPassword: tailscalePassword || undefined,
-      });
-      if (!res.ok) {
-        throw new Error(
-          data?.error ||
-            translateOrFallback("tailscaleEnableFailed", "Failed to enable Tailscale Funnel")
-        );
-      }
-
-      if (data?.needsLogin && data?.authUrl) {
-        window.open(data.authUrl, "tailscale_auth", "width=680,height=780");
-        setTailscaleNotice({
-          type: "info",
-          message: translateOrFallback(
-            "tailscaleWaitingForLogin",
-            "Complete the Tailscale login in the opened browser tab. OmniRoute will retry automatically."
-          ),
-        });
-
-        const loggedIn = await waitForTailscale((status) => status.loggedIn);
-        if (!loggedIn) {
-          throw new Error(
-            translateOrFallback("tailscaleLoginTimedOut", "Timed out waiting for Tailscale login")
-          );
-        }
-
-        ({ res, data } = await requestTailscaleEnable({
-          sudoPassword: tailscalePassword || undefined,
-        }));
-        if (!res.ok) {
-          throw new Error(
-            data?.error ||
-              translateOrFallback("tailscaleEnableFailed", "Failed to enable Tailscale Funnel")
-          );
-        }
-      }
-
-      if (data?.funnelNotEnabled && data?.enableUrl) {
-        window.open(data.enableUrl, "tailscale_funnel", "width=680,height=780");
-        setTailscaleNotice({
-          type: "info",
-          message: translateOrFallback(
-            "tailscaleWaitingForFunnel",
-            "Enable Funnel for this device in the opened browser tab. OmniRoute will keep polling."
-          ),
-        });
-
-        let enabled = null;
-        for (let attempt = 0; attempt < 40; attempt += 1) {
-          await new Promise((resolve) => setTimeout(resolve, 3000));
-          const next = await requestTailscaleEnable({
-            sudoPassword: tailscalePassword || undefined,
-          });
-          if (!next.res.ok) {
-            throw new Error(
-              next.data?.error ||
-                translateOrFallback("tailscaleEnableFailed", "Failed to enable Tailscale Funnel")
-            );
-          }
-          if (next.data?.success) {
-            enabled = next;
-            break;
-          }
-          if (!next.data?.funnelNotEnabled) {
-            enabled = next;
-            break;
-          }
-        }
-
-        if (!enabled?.data?.success) {
-          throw new Error(
-            translateOrFallback(
-              "tailscaleFunnelTimedOut",
-              "Timed out waiting for Tailscale Funnel to be enabled"
-            )
-          );
-        }
-
-        data = enabled.data;
-      }
-
-      if (!data?.success) {
-        throw new Error(
-          data?.error ||
-            translateOrFallback("tailscaleEnableFailed", "Failed to enable Tailscale Funnel")
-        );
-      }
-
-      if (data?.status) {
-        setTailscaleStatus(data.status);
-      }
-      setTailscaleNotice({
-        type: "success",
-        message: translateOrFallback("tailscaleStarted", "Tailscale Funnel enabled"),
-      });
-    } catch (error) {
-      setTailscaleNotice({
-        type: "error",
-        message:
-          error instanceof Error
-            ? error.message
-            : translateOrFallback("tailscaleEnableFailed", "Failed to enable Tailscale Funnel"),
-      });
-    } finally {
-      setTailscaleBusy(false);
-      await fetchTailscaleStatus(true);
-    }
-  }, [
-    fetchTailscaleStatus,
-    requestTailscaleEnable,
-    tailscalePassword,
-    translateOrFallback,
-    waitForTailscale,
-  ]);
-
-  const handleTailscaleDisable = useCallback(async () => {
-    setTailscaleBusy(true);
-    setTailscaleNotice(null);
-
-    try {
-      const res = await fetch("/api/tunnels/tailscale/disable", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sudoPassword: tailscalePassword || undefined }),
-      });
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        throw new Error(
-          data?.error ||
-            translateOrFallback("tailscaleDisableFailed", "Failed to disable Tailscale Funnel")
-        );
-      }
-
-      if (data?.status) {
-        setTailscaleStatus(data.status);
-      }
-      setTailscaleNotice({
-        type: "success",
-        message: translateOrFallback("tailscaleStopped", "Tailscale Funnel disabled"),
-      });
-    } catch (error) {
-      setTailscaleNotice({
-        type: "error",
-        message:
-          error instanceof Error
-            ? error.message
-            : translateOrFallback("tailscaleDisableFailed", "Failed to disable Tailscale Funnel"),
-      });
-    } finally {
-      setTailscaleBusy(false);
-      await fetchTailscaleStatus(true);
-    }
-  }, [fetchTailscaleStatus, tailscalePassword, translateOrFallback]);
-
-  const handleTailscaleInstall = useCallback(async () => {
-    setTailscaleInstallBusy(true);
-    setTailscaleInstallLog([]);
-    setTailscaleNotice(null);
-
-    try {
-      const res = await fetch("/api/tunnels/tailscale/install", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sudoPassword: tailscalePassword || undefined }),
-      });
-
-      if (!res.body) {
-        throw new Error(
-          translateOrFallback("tailscaleInstallFailed", "Failed to install Tailscale")
-        );
-      }
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let installSucceeded = false;
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const parts = buffer.split("\n\n");
-        buffer = parts.pop() || "";
-
-        for (const part of parts) {
-          const lines = part.split("\n");
-          let eventName = "progress";
-          let payload: Record<string, unknown> | null = null;
-
-          for (const line of lines) {
-            if (line.startsWith("event: ")) {
-              eventName = line.slice(7).trim();
-            } else if (line.startsWith("data: ")) {
-              payload = JSON.parse(line.slice(6));
-            }
-          }
-
-          if (!payload) continue;
-
-          if (eventName === "progress") {
-            const message =
-              typeof payload.message === "string"
-                ? payload.message
-                : translateOrFallback("tailscaleInstallProgress", "Working...");
-            setTailscaleInstallLog((current) => [...current.slice(-79), message]);
-          } else if (eventName === "done") {
-            installSucceeded = true;
-            if (payload.status) {
-              setTailscaleStatus(payload.status as TailscaleTunnelStatus);
-            }
-          } else if (eventName === "error") {
-            throw new Error(
-              typeof payload.error === "string"
-                ? payload.error
-                : translateOrFallback("tailscaleInstallFailed", "Failed to install Tailscale")
-            );
-          }
-        }
-      }
-
-      if (!installSucceeded) {
-        throw new Error(
-          translateOrFallback("tailscaleInstallFailed", "Failed to install Tailscale")
-        );
-      }
-
-      setShowTailscaleInstallModal(false);
-      setTailscalePassword("");
-      setTailscaleNotice({
-        type: "success",
-        message: translateOrFallback("tailscaleInstalled", "Tailscale installed successfully"),
-      });
-      await fetchTailscaleStatus(true);
-      await handleTailscaleEnable();
-    } catch (error) {
-      setTailscaleNotice({
-        type: "error",
-        message:
-          error instanceof Error
-            ? error.message
-            : translateOrFallback("tailscaleInstallFailed", "Failed to install Tailscale"),
-      });
-    } finally {
-      setTailscaleInstallBusy(false);
-    }
-  }, [fetchTailscaleStatus, handleTailscaleEnable, tailscalePassword, translateOrFallback]);
-
   const displayBaseUrl = useDisplayBaseUrl();
   const displayApiUrl = `${displayBaseUrl}/v1`;
   const publicDisplayApiUrl = isPublicDisplayBaseUrl(displayBaseUrl) ? displayApiUrl : null;
@@ -1085,33 +405,12 @@ export default function APIPageClient({ machineId }: Readonly<APIPageClientProps
     );
   }
 
-  const activeTunnelUrls = [
+  const currentEndpoint =
+    (cloudEnabled && cloudEndpointNew ? cloudEndpointNew : null) ?? displayApiUrl;
+  const activeUrls = [
     ...(publicDisplayApiUrl
       ? [{ label: t("tierPublic"), url: publicDisplayApiUrl, key: "active_public" }]
       : []),
-    ...(cloudflaredStatus?.running && cloudflaredStatus.apiUrl
-      ? [{ label: "Cloudflare", url: cloudflaredStatus.apiUrl, key: "active_cf" }]
-      : []),
-    ...(tailscaleStatus?.running && (tailscaleStatus.apiUrl ?? tailscaleStatus.tunnelUrl)
-      ? [
-          {
-            label: "Tailscale",
-            url: tailscaleStatus.apiUrl ?? tailscaleStatus.tunnelUrl ?? "",
-            key: "active_ts",
-          },
-        ]
-      : []),
-    ...(ngrokStatus?.running && ngrokStatus.apiUrl
-      ? [{ label: "ngrok", url: ngrokStatus.apiUrl, key: "active_ngrok" }]
-      : []),
-  ];
-  const preferredTunnelUrl = activeTunnelUrls[0]?.url ?? null;
-  const currentEndpoint =
-    preferredTunnelUrl ??
-    (cloudEnabled && cloudEndpointNew ? cloudEndpointNew : null) ??
-    displayApiUrl;
-  const activeUrls = [
-    ...activeTunnelUrls,
     ...(cloudEnabled && cloudEndpointNew
       ? [{ label: t("activeCloud"), url: cloudEndpointNew, key: "active_cloud" }]
       : []),
@@ -1120,150 +419,9 @@ export default function APIPageClient({ machineId }: Readonly<APIPageClientProps
     (candidate, index, candidates) =>
       candidates.findIndex((other) => other.url === candidate.url) === index
   );
-  const visibleTunnelCount = [showCloudflaredTunnel, showTailscaleFunnel, showNgrokTunnel].filter(
-    Boolean
-  ).length;
-  const activeTunnelCount = [
-    showCloudflaredTunnel && cloudflaredStatus?.running,
-    showTailscaleFunnel && tailscaleStatus?.running,
-    showNgrokTunnel && ngrokStatus?.running,
-  ].filter(Boolean).length;
-
-  const mcpOnline = Boolean(mcpStatus?.online);
-  const a2aOnline = a2aStatus?.status === "ok";
-  const mcpToolCount = Number(mcpStatus?.heartbeat?.toolCount || 0);
-  const a2aActiveStreams = Number(a2aStatus?.tasks?.activeStreams || 0);
-  const cloudflaredPhase = cloudflaredStatus?.phase || "not_installed";
-  const cloudflaredPhaseMeta: Record<CloudflaredTunnelPhase, { label: string; className: string }> =
-    {
-      running: {
-        label: translateOrFallback("cloudflaredRunning", "Running"),
-        className: "bg-green-500/10 border-green-500/30 text-green-400",
-      },
-      starting: {
-        label: translateOrFallback("cloudflaredStarting", "Starting"),
-        className: "bg-blue-500/10 border-blue-500/30 text-blue-400",
-      },
-      stopped: {
-        label: translateOrFallback("cloudflaredStoppedState", "Stopped"),
-        className: "bg-surface border-border/70 text-text-muted",
-      },
-      not_installed: {
-        label: translateOrFallback("cloudflaredNotInstalled", "Not installed"),
-        className: "bg-surface border-border/70 text-text-muted",
-      },
-      unsupported: {
-        label: translateOrFallback("cloudflaredUnsupported", "Unsupported"),
-        className: "bg-amber-500/10 border-amber-500/30 text-amber-400",
-      },
-      error: {
-        label: translateOrFallback("cloudflaredError", "Error"),
-        className: "bg-red-500/10 border-red-500/30 text-red-400",
-      },
-    };
-  const cloudflaredActionLabel = cloudflaredStatus?.running
-    ? translateOrFallback("cloudflaredDisable", "Stop Tunnel")
-    : cloudflaredStatus?.installed
-      ? translateOrFallback("cloudflaredEnable", "Enable Tunnel")
-      : translateOrFallback("cloudflaredInstallAndEnable", "Install & Enable");
-  const cloudflaredUrlNotice = translateOrFallback(
-    "cloudflaredUrlNotice",
-    "Creates a temporary Cloudflare Quick Tunnel. The URL changes after every restart."
-  );
-  const tailscalePhase = tailscaleStatus?.phase || "not_installed";
-  const tailscalePhaseMeta: Record<TailscaleTunnelPhase, { label: string; className: string }> = {
-    running: {
-      label: translateOrFallback("tailscaleRunning", "Running"),
-      className: "bg-green-500/10 border-green-500/30 text-green-400",
-    },
-    needs_login: {
-      label: translateOrFallback("tailscaleNeedsLogin", "Needs Login"),
-      className: "bg-blue-500/10 border-blue-500/30 text-blue-400",
-    },
-    stopped: {
-      label: translateOrFallback("tailscaleStoppedState", "Stopped"),
-      className: "bg-surface border-border/70 text-text-muted",
-    },
-    not_installed: {
-      label: translateOrFallback("tailscaleNotInstalled", "Not installed"),
-      className: "bg-surface border-border/70 text-text-muted",
-    },
-    unsupported: {
-      label: translateOrFallback("tailscaleUnsupported", "Unsupported"),
-      className: "bg-amber-500/10 border-amber-500/30 text-amber-400",
-    },
-    error: {
-      label: translateOrFallback("tailscaleError", "Error"),
-      className: "bg-red-500/10 border-red-500/30 text-red-400",
-    },
-  };
-  const tailscaleActionLabel = tailscaleStatus?.running
-    ? translateOrFallback("tailscaleDisable", "Stop Funnel")
-    : tailscaleStatus?.installed
-      ? tailscaleStatus?.loggedIn
-        ? translateOrFallback("tailscaleEnable", "Enable Funnel")
-        : translateOrFallback("tailscaleLoginAndEnable", "Login & Enable")
-      : translateOrFallback("tailscaleInstallAndEnable", "Install & Enable");
-  const tailscaleUrlNotice = translateOrFallback(
-    "tailscaleUrlNotice",
-    "Uses your Tailscale .ts.net address. Login and Funnel approval may be required on first use."
-  );
-
-  const ngrokPhase = ngrokStatus?.phase || "not_installed";
-  const ngrokPhaseMeta: Record<NgrokTunnelPhase, { label: string; className: string }> = {
-    running: {
-      label: translateOrFallback("ngrokRunning", "Running"),
-      className: "bg-green-500/10 border-green-500/30 text-green-400",
-    },
-    starting: {
-      label: translateOrFallback("ngrokStarting", "Starting"),
-      className: "bg-blue-500/10 border-blue-500/30 text-blue-400",
-    },
-    stopped: {
-      label: translateOrFallback("ngrokStoppedState", "Stopped"),
-      className: "bg-surface border-border/70 text-text-muted",
-    },
-    needs_auth: {
-      label: translateOrFallback("ngrokNeedsAuth", "Needs Auth"),
-      className: "bg-amber-500/10 border-amber-500/30 text-amber-400",
-    },
-    not_installed: {
-      label: translateOrFallback("ngrokNotInstalled", "Not installed"),
-      className: "bg-surface border-border/70 text-text-muted",
-    },
-    unsupported: {
-      label: translateOrFallback("ngrokUnsupported", "Unsupported"),
-      className: "bg-amber-500/10 border-amber-500/30 text-amber-400",
-    },
-    error: {
-      label: translateOrFallback("ngrokError", "Error"),
-      className: "bg-red-500/10 border-red-500/30 text-red-400",
-    },
-  };
-  const ngrokActionLabel = ngrokStatus?.running
-    ? translateOrFallback("ngrokDisable", "Stop Tunnel")
-    : translateOrFallback("ngrokEnable", "Enable Tunnel");
-  const ngrokUrlNotice = translateOrFallback("ngrokUrlNotice", "Creates a public ngrok tunnel.");
 
   return (
     <div className="flex flex-col gap-8">
-      <SegmentedControl
-        options={ENDPOINT_TABS.map((tab) => ({ ...tab, label: t(tab.labelKey) }))}
-        value={activeEndpointTab}
-        onChange={(value) => setActiveEndpointTab(value as EndpointTab)}
-        aria-label={t("endpointSections")}
-        className="w-fit"
-      />
-
-      {activeEndpointTab === "mcp" ? <McpDashboardPage /> : null}
-      {activeEndpointTab === "a2a" ? <A2ADashboardPage /> : null}
-      {activeEndpointTab === "context-sources" ? (
-        <div className="flex flex-col gap-4">
-          <NotionSourceCard />
-          <ObsidianSourceCard />
-        </div>
-      ) : null}
-
       {/* Endpoint Card */}
       <Card>
         <h2 className="text-lg font-semibold mb-4">{t("title")}</h2>
@@ -1367,23 +525,6 @@ export default function APIPageClient({ machineId }: Readonly<APIPageClientProps
             </button>
           </div>
 
-          {/* Tunnels section header */}
-          <div className="flex items-center gap-2 pt-4 pb-1 border-t border-border/50">
-            <span className="material-symbols-outlined text-[14px] text-text-muted">
-              network_node
-            </span>
-            <span className="text-[10px] font-semibold text-text-muted uppercase tracking-wider">
-              {t("tunnels")}
-            </span>
-            <div className="flex-1 h-px bg-border/50" />
-            <span className="text-[10px] text-text-muted">
-              {t("activeTunnelCount", {
-                active: activeTunnelCount,
-                total: visibleTunnelCount,
-              })}
-            </span>
-          </div>
-
           {/* Cloud OmniRoute */}
           <div className="flex items-center gap-3 py-3">
             <span className="material-symbols-outlined text-[18px] text-blue-400 shrink-0">
@@ -1432,348 +573,6 @@ export default function APIPageClient({ machineId }: Readonly<APIPageClientProps
               </span>
             )}
           </div>
-
-          {/* Cloudflare Quick Tunnel */}
-          {showCloudflaredTunnel && (
-            <div className="border-t border-border/30">
-              <div className="flex items-center gap-3 py-3">
-                <span className="material-symbols-outlined text-[18px] text-orange-400 shrink-0">
-                  cloud_queue
-                </span>
-                <div className="flex-1 min-w-0">
-                  <span className="text-sm font-medium">
-                    {translateOrFallback("cloudflaredTitle", "Cloudflare Quick Tunnel")}
-                  </span>
-                </div>
-                <span
-                  className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium shrink-0 ${cloudflaredPhaseMeta[cloudflaredPhase].className}`}
-                >
-                  {cloudflaredPhaseMeta[cloudflaredPhase].label}
-                </span>
-                {cloudflaredStatus?.supported !== false && (
-                  <Button
-                    size="sm"
-                    variant={cloudflaredStatus?.running ? "secondary" : "primary"}
-                    icon={cloudflaredStatus?.running ? "cloud_off" : "cloud_upload"}
-                    loading={cloudflaredBusy}
-                    onClick={() => {
-                      void handleCloudflaredAction(
-                        cloudflaredStatus?.running ? "disable" : "enable"
-                      );
-                    }}
-                    className={`shrink-0 ${cloudflaredStatus?.running ? "border-border/70! text-text-muted! hover:text-text!" : ""}`}
-                  >
-                    {cloudflaredActionLabel}
-                  </Button>
-                )}
-              </div>
-              {cloudflaredNotice && (
-                <div
-                  className={`mb-2 ml-7 flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
-                    cloudflaredNotice.type === "success"
-                      ? "border-green-500/30 bg-green-500/10 text-green-400"
-                      : cloudflaredNotice.type === "info"
-                        ? "border-blue-500/30 bg-blue-500/10 text-blue-400"
-                        : "border-red-500/30 bg-red-500/10 text-red-400"
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-[18px]">
-                    {cloudflaredNotice.type === "success"
-                      ? "check_circle"
-                      : cloudflaredNotice.type === "info"
-                        ? "info"
-                        : "error"}
-                  </span>
-                  <span className="flex-1">{cloudflaredNotice.message}</span>
-                  <button
-                    onClick={() => setCloudflaredNotice(null)}
-                    className="rounded p-0.5 transition-colors hover:bg-white/10"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">close</span>
-                  </button>
-                </div>
-              )}
-              {cloudflaredStatus?.lastError && (
-                <p className="mb-2 ml-7 text-xs text-red-400">
-                  {translateOrFallback("cloudflaredLastError", "Last error: {error}", {
-                    error: cloudflaredStatus.lastError,
-                  })}
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* Tailscale Funnel */}
-          {showTailscaleFunnel && (
-            <div className={showCloudflaredTunnel ? "border-t border-border/30" : ""}>
-              <div
-                role="button"
-                tabIndex={0}
-                className="w-full flex items-center gap-3 py-3 hover:bg-surface/40 transition-colors rounded -mx-1 px-1 text-left cursor-pointer"
-                onClick={() => setExpandedTunnel(expandedTunnel === "ts" ? null : "ts")}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    setExpandedTunnel(expandedTunnel === "ts" ? null : "ts");
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined text-[18px] text-indigo-400 shrink-0">
-                  vpn_lock
-                </span>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-baseline gap-1 flex-wrap">
-                    <span className="text-sm font-medium">
-                      {translateOrFallback("tailscaleTitle", "Tailscale Funnel")}
-                    </span>
-                    {tailscaleIpUrl && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          void copy(tailscaleIpUrl, "tailscale_ip_inline");
-                        }}
-                        title={`Copy ${tailscaleIpUrl}`}
-                        className="inline-flex items-center gap-0.5 text-[10px] text-text-muted hover:text-text transition-colors"
-                      >
-                        <code className="font-mono">
-                          {tailscaleIpUrl.replace(/^https?:\/\//, "")}
-                        </code>
-                        <span className="material-symbols-outlined text-[10px] opacity-60">
-                          {copied === "tailscale_ip_inline" ? "check" : "content_copy"}
-                        </span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <span
-                  className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium shrink-0 ${tailscalePhaseMeta[tailscalePhase].className}`}
-                >
-                  {tailscalePhaseMeta[tailscalePhase].label}
-                </span>
-                {tailscaleStatus?.supported !== false && (
-                  <Button
-                    size="sm"
-                    variant={tailscaleStatus?.running ? "secondary" : "primary"}
-                    icon={tailscaleStatus?.running ? "vpn_key_off" : "vpn_lock"}
-                    loading={tailscaleBusy}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (tailscaleStatus?.running) {
-                        void handleTailscaleDisable();
-                      } else if (tailscaleStatus?.installed) {
-                        void handleTailscaleEnable();
-                      } else {
-                        setShowTailscaleInstallModal(true);
-                      }
-                    }}
-                    className={`shrink-0 ${tailscaleStatus?.running ? "border-border/70! text-text-muted! hover:text-text!" : ""}`}
-                  >
-                    {tailscaleActionLabel}
-                  </Button>
-                )}
-                <span
-                  className="material-symbols-outlined text-[18px] text-text-muted shrink-0 transition-transform duration-200"
-                  style={{
-                    transform: expandedTunnel === "ts" ? "rotate(180deg)" : "rotate(0deg)",
-                  }}
-                >
-                  expand_more
-                </span>
-              </div>
-              {expandedTunnel === "ts" && (
-                <div className="pb-3 pl-7 pr-1 flex flex-col gap-2">
-                  {tailscaleNotice && (
-                    <div
-                      className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
-                        tailscaleNotice.type === "success"
-                          ? "border-green-500/30 bg-green-500/10 text-green-400"
-                          : tailscaleNotice.type === "info"
-                            ? "border-blue-500/30 bg-blue-500/10 text-blue-400"
-                            : "border-red-500/30 bg-red-500/10 text-red-400"
-                      }`}
-                    >
-                      <span className="material-symbols-outlined text-[18px]">
-                        {tailscaleNotice.type === "success"
-                          ? "check_circle"
-                          : tailscaleNotice.type === "info"
-                            ? "info"
-                            : "error"}
-                      </span>
-                      <span className="flex-1">{tailscaleNotice.message}</span>
-                      <button
-                        onClick={() => setTailscaleNotice(null)}
-                        className="rounded p-0.5 transition-colors hover:bg-white/10"
-                      >
-                        <span className="material-symbols-outlined text-[16px]">close</span>
-                      </button>
-                    </div>
-                  )}
-                  <p className="text-xs text-text-muted">{tailscaleUrlNotice}</p>
-                  {tailscaleStatus?.phase === "needs_login" && (
-                    <p className="text-xs text-blue-400">
-                      {translateOrFallback(
-                        "tailscaleNeedsLoginHint",
-                        "Authenticate this machine with Tailscale, then enable Funnel."
-                      )}
-                    </p>
-                  )}
-                  {tailscaleStatus?.installed && tailscaleStatus?.platform !== "win32" && (
-                    <div className="flex flex-col gap-1">
-                      <label className="text-xs text-text-muted">
-                        {translateOrFallback(
-                          "tailscaleSudoLabel",
-                          "Sudo Password (required on macOS/Linux)"
-                        )}
-                      </label>
-                      <Input
-                        type="password"
-                        value={tailscalePassword}
-                        onChange={(event) => setTailscalePassword(event.target.value)}
-                        placeholder={translateOrFallback(
-                          "tailscaleSudoPlaceholder",
-                          "Optional sudo password"
-                        )}
-                        disabled={tailscaleBusy}
-                        className="font-mono text-sm"
-                      />
-                    </div>
-                  )}
-                  {tailscaleStatus?.binaryPath && (
-                    <p className="text-xs text-text-muted">
-                      {translateOrFallback("tailscaleBinaryPath", "Binary: {path}", {
-                        path: tailscaleStatus.binaryPath,
-                      })}
-                    </p>
-                  )}
-                  {tailscaleStatus?.lastError && (
-                    <p className="text-xs text-red-400">
-                      {translateOrFallback("tailscaleLastError", "Last error: {error}", {
-                        error: tailscaleStatus.lastError,
-                      })}
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ngrok Tunnel */}
-          {showNgrokTunnel && (
-            <div
-              className={
-                showCloudflaredTunnel || showTailscaleFunnel ? "border-t border-border/30" : ""
-              }
-            >
-              <div
-                role="button"
-                tabIndex={0}
-                className="w-full flex items-center gap-3 py-3 hover:bg-surface/40 transition-colors rounded -mx-1 px-1 text-left cursor-pointer"
-                onClick={() => setExpandedTunnel(expandedTunnel === "ngrok" ? null : "ngrok")}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    setExpandedTunnel(expandedTunnel === "ngrok" ? null : "ngrok");
-                  }
-                }}
-              >
-                <span className="material-symbols-outlined text-[18px] text-purple-400 shrink-0">
-                  public
-                </span>
-                <div className="flex-1 min-w-0">
-                  <span className="text-sm font-medium">
-                    {translateOrFallback("ngrokTitle", "ngrok Tunnel")}
-                  </span>
-                </div>
-                <span
-                  className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium shrink-0 ${ngrokPhaseMeta[ngrokPhase].className}`}
-                >
-                  {ngrokPhaseMeta[ngrokPhase].label}
-                </span>
-                {ngrokStatus?.supported !== false && (
-                  <Button
-                    size="sm"
-                    variant={ngrokStatus?.running ? "secondary" : "primary"}
-                    icon={ngrokStatus?.running ? "public_off" : "public"}
-                    loading={ngrokBusy}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      void handleNgrokAction(ngrokStatus?.running ? "disable" : "enable");
-                    }}
-                    className={`shrink-0 ${ngrokStatus?.running ? "border-border/70! text-text-muted! hover:text-text!" : ""}`}
-                  >
-                    {ngrokActionLabel}
-                  </Button>
-                )}
-                <span
-                  className="material-symbols-outlined text-[18px] text-text-muted shrink-0 transition-transform duration-200"
-                  style={{
-                    transform: expandedTunnel === "ngrok" ? "rotate(180deg)" : "rotate(0deg)",
-                  }}
-                >
-                  expand_more
-                </span>
-              </div>
-              {expandedTunnel === "ngrok" && (
-                <div className="pb-3 pl-7 pr-1 flex flex-col gap-2">
-                  {ngrokNotice && (
-                    <div
-                      className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
-                        ngrokNotice.type === "success"
-                          ? "border-green-500/30 bg-green-500/10 text-green-400"
-                          : ngrokNotice.type === "info"
-                            ? "border-blue-500/30 bg-blue-500/10 text-blue-400"
-                            : "border-red-500/30 bg-red-500/10 text-red-400"
-                      }`}
-                    >
-                      <span className="material-symbols-outlined text-[18px]">
-                        {ngrokNotice.type === "success"
-                          ? "check_circle"
-                          : ngrokNotice.type === "info"
-                            ? "info"
-                            : "error"}
-                      </span>
-                      <span className="flex-1">{ngrokNotice.message}</span>
-                      <button
-                        onClick={() => setNgrokNotice(null)}
-                        className="rounded p-0.5 transition-colors hover:bg-white/10"
-                      >
-                        <span className="material-symbols-outlined text-[16px]">close</span>
-                      </button>
-                    </div>
-                  )}
-                  <p className="text-xs text-text-muted">{ngrokUrlNotice}</p>
-                  {ngrokStatus?.phase === "needs_auth" && (
-                    <div className="flex flex-col gap-1">
-                      <label className="text-xs text-text-muted">
-                        {translateOrFallback(
-                          "ngrokAuthTokenLabel",
-                          "Authtoken (Required if NGROK_AUTHTOKEN not set in environment)"
-                        )}
-                      </label>
-                      <Input
-                        type="password"
-                        value={ngrokToken}
-                        onChange={(event) => setNgrokToken(event.target.value)}
-                        placeholder={translateOrFallback(
-                          "ngrokAuthTokenPlaceholder",
-                          "Enter your ngrok authtoken"
-                        )}
-                        disabled={ngrokBusy}
-                        className="font-mono text-sm"
-                      />
-                    </div>
-                  )}
-                  {ngrokStatus?.lastError && (
-                    <p className="text-xs text-red-400">
-                      {translateOrFallback("ngrokLastError", "Last error: {error}", {
-                        error: ngrokStatus.lastError,
-                      })}
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
         </div>
 
         {/* Custom System Prompt */}
@@ -2236,71 +1035,6 @@ export default function APIPageClient({ machineId }: Readonly<APIPageClientProps
         </div>
       </Modal>
 
-      <Modal
-        isOpen={showTailscaleInstallModal}
-        title={translateOrFallback("tailscaleInstallTitle", "Install Tailscale")}
-        onClose={() => !tailscaleInstallBusy && setShowTailscaleInstallModal(false)}
-      >
-        <div className="flex flex-col gap-4">
-          <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 p-4">
-            <p className="text-sm font-medium text-blue-300">
-              {translateOrFallback(
-                "tailscaleInstallIntro",
-                "Installs Tailscale on this machine and prepares OmniRoute to enable Funnel."
-              )}
-            </p>
-            <p className="mt-2 text-sm text-blue-200/80">
-              {translateOrFallback(
-                "tailscaleInstallPasswordHint",
-                "On macOS and Linux, sudo may be required for the package install and daemon start."
-              )}
-            </p>
-          </div>
-
-          <Input
-            type="password"
-            value={tailscalePassword}
-            onChange={(event) => setTailscalePassword(event.target.value)}
-            placeholder={translateOrFallback("tailscaleSudoPlaceholder", "Optional sudo password")}
-            disabled={tailscaleInstallBusy}
-          />
-
-          {tailscaleInstallLog.length > 0 && (
-            <div className="max-h-48 overflow-auto rounded-lg border border-border/70 bg-surface/60 p-3">
-              <pre className="whitespace-pre-wrap text-xs text-text-muted">
-                {tailscaleInstallLog.join("\n")}
-              </pre>
-            </div>
-          )}
-
-          <div className="flex gap-2">
-            <Button
-              onClick={() => void handleTailscaleInstall()}
-              fullWidth
-              disabled={tailscaleInstallBusy}
-            >
-              {tailscaleInstallBusy ? (
-                <span className="flex items-center gap-2">
-                  <span className="material-symbols-outlined animate-spin text-sm">
-                    progress_activity
-                  </span>
-                  {translateOrFallback("tailscaleInstalling", "Installing")}
-                </span>
-              ) : (
-                translateOrFallback("tailscaleInstallAndEnable", "Install & Enable")
-              )}
-            </Button>
-            <Button
-              onClick={() => setShowTailscaleInstallModal(false)}
-              variant="ghost"
-              fullWidth
-              disabled={tailscaleInstallBusy}
-            >
-              {tc("cancel")}
-            </Button>
-          </div>
-        </div>
-      </Modal>
       {/* Provider Models Popup */}
       {selectedProvider && (
         <ProviderModelsModal

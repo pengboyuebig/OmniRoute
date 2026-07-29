@@ -64,7 +64,6 @@ import { createComboContext } from "./combo/context.ts";
 import { phaseComboSetup } from "./combo/comboSetup.ts";
 import { checkCredentialGate, logCredentialSkip } from "./credentialGate.ts";
 import { emit } from "../../src/lib/events/eventBus";
-import { notifyWebhookEvent } from "../../src/lib/webhookDispatcher";
 import { type ProviderCandidate } from "./autoCombo/scoring.ts";
 import { estimateTokens } from "./contextManager.ts";
 import { getSessionConnection } from "./sessionManager.ts";
@@ -1297,19 +1296,6 @@ export async function handleComboChat({
                 recordStickyWeightedSuccess(combo.name, stickySuccessKey, stickyWeightedLimit);
               }
             }
-            // Webhook fan-out: best-effort, never blocks the response stream.
-            notifyWebhookEvent("request.completed", {
-              combo: combo.name,
-              provider,
-              model: modelStr,
-              account:
-                typeof target.label === "string" && target.label.trim().length > 0
-                  ? target.label.trim()
-                  : "",
-              accountId: effectiveConnectionId ?? "",
-              latencyMs,
-              fallbackCount,
-            });
 
             // Silent-stop fix: reset the consecutive-failure counter for this session-combo pair
             // on every successful dispatch so a transient recovery doesn't get "credited" against
@@ -1974,12 +1960,6 @@ export async function handleComboChat({
             strategy,
           });
         }
-        notifyWebhookEvent("request.failed", {
-          combo: combo.name,
-          reason: "COMBO_TIMEOUT",
-          latencyMs,
-          fallbackCount,
-        });
         return errorResponseWithComboDiagnostics(504, msg, buildComboDiag("combo_timeout"), {
           code: "COMBO_TIMEOUT",
           type: "server_error",
@@ -2002,12 +1982,6 @@ export async function handleComboChat({
 
       // All set retries exhausted — return the final error
       if (!lastStatus) {
-        notifyWebhookEvent("request.failed", {
-          combo: combo.name,
-          reason: "ALL_ACCOUNTS_INACTIVE",
-          latencyMs,
-          fallbackCount,
-        });
         // Silent-stop fix: bump the failure counter so the session pin clears on the 3rd
         // consecutive all-inactive cascade; buildRecoveryHint emits `switch-combo` with a
         // next-step that points the user at /dashboard/providers.

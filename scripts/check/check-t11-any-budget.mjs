@@ -28,12 +28,6 @@ const budget = [
   { file: "src/lib/usage/usageHistory.ts", maxAny: 0 },
   { file: "open-sse/config/providerRegistry.ts", maxAny: 0 },
   { file: "open-sse/config/providerModels.ts", maxAny: 0 },
-  { file: "open-sse/mcp-server/audit.ts", maxAny: 0 },
-  // 3 `(toolDef: any)` in the dynamic memory/skill/compression tool-registration
-  // loops (#3077) — heterogeneous tool defs accessed via existing `@ts-ignore`
-  // dynamic-zod paths; pragmatic dynamic dispatch, not a type-safety regression.
-  { file: "open-sse/mcp-server/server.ts", maxAny: 3 },
-  { file: "open-sse/mcp-server/tools/advancedTools.ts", maxAny: 0 },
   { file: "open-sse/services/signatureCache.ts", maxAny: 0 },
   { file: "open-sse/services/comboMetrics.ts", maxAny: 0 },
   { file: "open-sse/services/sessionManager.ts", maxAny: 0 },
@@ -91,8 +85,6 @@ const budget = [
   { file: "open-sse/handlers/moderations.ts", maxAny: 0 },
   { file: "open-sse/handlers/rerank.ts", maxAny: 0 },
   { file: "open-sse/handlers/responsesHandler.ts", maxAny: 0 },
-  { file: "open-sse/mcp-server/__tests__/advancedTools.test.ts", maxAny: 0 },
-  { file: "open-sse/mcp-server/__tests__/essentialTools.test.ts", maxAny: 0 },
   { file: "open-sse/services/combo.ts", maxAny: 0 },
   { file: "open-sse/services/thinkingBudget.ts", maxAny: 0 },
   { file: "open-sse/translator/helpers/geminiHelper.ts", maxAny: 0 },

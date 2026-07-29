@@ -122,7 +122,6 @@ const CRITICAL_DB_TABLES: CriticalTableSpec[] = [
   { table: "provider_key_limits", maxRows: 10_000 },
   { table: "account_key_limits", maxRows: 10_000 },
   { table: "upstream_proxy_config", maxRows: 5_000 },
-  { table: "webhooks", maxRows: 5_000 },
 ];
 
 export function isNativeSqliteLoadError(error: unknown): boolean {

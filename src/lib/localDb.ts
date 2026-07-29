@@ -227,13 +227,6 @@ export {
 export type { ExportAllRows } from "./db/backup";
 
 export {
-  // Skills DB operations (#3500 slice 5)
-  updateSkill,
-} from "./db/skills";
-
-export type { SkillPatch } from "./db/skills";
-
-export {
   // Read Cache (cached wrappers for hot-read paths)
   getCachedSettings,
   getCachedPricing,
@@ -317,21 +310,6 @@ export type { BatchItemCheckpoint, BatchRecord } from "./db/batches";
 export type { ModelComboMapping } from "./db/modelComboMappings";
 export * from "./db/reasoningRoutingRules";
 export * from "./db/autoCandidateOverrides";
-export {
-  // Webhooks
-  getWebhooks,
-  getWebhook,
-  getEnabledWebhooks,
-  createWebhook,
-  updateWebhook as updateWebhookRecord,
-  deleteWebhook,
-  recordWebhookDelivery,
-  disableWebhooksWithHighFailures,
-} from "./db/webhooks";
-
-export type { Webhook, WebhookKind } from "./db/webhooks";
-
-export { insertDelivery, getDeliveries } from "./db/webhookDeliveries";
 
 export {
   upsertDiscoveryResult,
@@ -348,7 +326,6 @@ export type {
   DiscoveryRiskLevel,
   DiscoveryStatus,
 } from "./db/discoveryResults";
-export type { WebhookDelivery } from "./db/webhookDeliveries";
 
 export {
   saveQuotaSnapshot,
@@ -456,42 +433,6 @@ export {
   stopSessionAccountAffinityCleanupForTests,
 } from "./db/sessionAccountAffinity";
 
-export {
-  // Gamification & Leaderboard
-  updateScore,
-  getRank,
-  getTopN,
-  addXp,
-  getXp,
-  updateLevel,
-  unlockBadge,
-  hasBadge,
-  getBadges,
-  getBadgeDefinitions,
-  transferTokens,
-  getBalance,
-  getHistory,
-  createInviteToken,
-  getInviteByCode,
-  redeemInvite,
-  revokeInvite,
-  connectServer,
-  disconnectServer,
-  listServers,
-  getConnectedServerByKeyHash,
-} from "./db/gamification";
-
-export type {
-  LeaderboardRow,
-  UserLevelRow,
-  BadgeDefinition,
-  UserBadge,
-  XpAuditLogEntry,
-  TokenLedgerEntry,
-  InviteToken,
-  CommunityServer,
-} from "./db/gamification";
-
 export * from "./db/featureFlags";
 
 export {
@@ -589,16 +530,6 @@ export {
 } from "./db/playgroundPresets";
 
 export type { PlaygroundPresetListItem } from "./db/playgroundPresets";
-// Plan 21 — Memory Engine Redesign
-export {
-  getMemoryVecMeta,
-  setMemoryVecMeta,
-  markMemoryNeedsReindex,
-  markAllMemoriesNeedReindex,
-  getMemoryReindexQueue,
-  countMemoryReindexPending,
-  type MemoryVecMeta,
-} from "./db/memoryVec";
 // T-A-F2: AgentBridge state/mappings/bypass + Inspector custom hosts/sessions
 export * from "./db/agentBridgeState";
 export * from "./db/agentBridgeMappings";
@@ -663,19 +594,6 @@ export type {
   UpsertTokenLimitInput,
   TokenWindowState,
 } from "./db/tokenLimits";
-
-export {
-  insertPlugin,
-  getPluginById,
-  getPluginByName,
-  listPlugins,
-  updatePluginStatus,
-  updatePluginConfig,
-  deletePlugin,
-  pluginExists,
-} from "./db/plugins";
-
-export type { PluginRow, PluginCreateInput } from "./db/plugins";
 
 export {
   getApiKeyContextSource,

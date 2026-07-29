@@ -142,7 +142,7 @@ console.log("  ✅ Standalone artifact present:", standaloneServerJs);
 
 // ── Step 3–7: Assemble standalone into dist/ ───────────────
 // All shared copy/sync/sanitize/chunk-patch operations are delegated to
-// assembleStandalone.  npm-UNIQUE steps (MITM, MCP, CLI, sidecars) follow.
+// assembleStandalone.  npm-UNIQUE steps (MITM, CLI, sidecars) follow.
 console.log("  📋 Assembling standalone bundle into dist/...");
 assembleStandalone({
   distDir: join(ROOT, NEXT_DIST),
@@ -226,38 +226,10 @@ if (existsSync(mitmSrc)) {
   }
 }
 
-// ── Step 8.5: Bundle MCP server ────────────────────────────
-const mcpSrcFile = join(ROOT, "open-sse", "mcp-server", "server.ts");
-const mcpDestDir = join(DIST_DIR, "open-sse", "mcp-server");
-const mcpDestFile = join(mcpDestDir, "server.js");
-
-if (existsSync(mcpSrcFile)) {
-  console.log("  🔨 Bundling MCP Server (TypeScript → JavaScript)...");
-  mkdirSync(mcpDestDir, { recursive: true });
-  try {
-    execFileSync(
-      NPX_BIN,
-      [
-        "esbuild",
-        "open-sse/mcp-server/server.ts",
-        "--bundle",
-        "--platform=node",
-        "--packages=external",
-        "--format=esm",
-        "--outfile=dist/open-sse/mcp-server/server.js",
-      ],
-      { cwd: ROOT, stdio: "inherit" }
-    );
-    console.log("  ✅ MCP Server bundled to dist/open-sse/mcp-server/server.js");
-  } catch (err: any) {
-    console.warn("  ⚠️  MCP Server bundle error:", err.message);
-  }
-}
-
 // ── Step 8.6: Bundle LLMLingua ONNX worker ────────────────────────────
 // The worker is spawned via worker_threads at a path the Next.js bundler cannot
-// statically trace, so it must ship as a standalone .js (mirrors the MCP-server
-// bundling above). Heavy deps (@atjsh/llmlingua-2 / @huggingface/transformers /
+// statically trace, so it must ship as a standalone .js (mirrors the esbuild
+// bundling pattern used above). Heavy deps (@atjsh/llmlingua-2 / @huggingface/transformers /
 // @tensorflow/tfjs / js-tiktoken) stay EXTERNAL — they are optionalDependencies,
 // dynamically imported at runtime, and the worker fail-opens if any is absent.
 const llmWorkerSrc = join(

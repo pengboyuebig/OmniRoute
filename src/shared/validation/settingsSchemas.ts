@@ -246,9 +246,6 @@ export const updateSettingsSchema = z.object({
   intentExtraReasoningKeywords: z.array(z.string().max(100)).optional(),
   intentExtraSimpleKeywords: z.array(z.string().max(100)).optional(),
   // Protocol toggles (default: disabled)
-  mcpEnabled: z.boolean().optional(),
-  mcpTransport: z.enum(["stdio", "sse", "streamable-http"]).optional(),
-  a2aEnabled: z.boolean().optional(),
   wsAuth: z.boolean().optional(),
   // CLI Fingerprint compatibility (per-provider)
   cliCompatProviders: z.array(z.string().max(100)).optional(),
@@ -414,8 +411,6 @@ export const databaseSettingsSchema = z
     retention: z.object({
       quotaSnapshots: z.number().int().min(1).max(3650), // Max 10 years
       compressionAnalytics: z.number().int().min(1).max(365),
-      mcpAudit: z.number().int().min(1).max(365),
-      a2aEvents: z.number().int().min(1).max(365),
       callLogs: z.number().int().min(1).max(3650),
       usageHistory: z.number().int().min(1).max(3650),
       memoryEntries: z.number().int().min(1).max(3650),

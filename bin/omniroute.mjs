@@ -7,7 +7,6 @@
  *   --version / -V (alone)    Fast-path: print the version and exit, skipping the
  *                             tsx/esm + polyfill imports, env-file loading, and
  *                             Commander's ~70-command registration entirely.
- *   --mcp                     Start MCP server over stdio
  *   reset-encrypted-columns   Recovery tool for broken encrypted credentials
  *   reset-password            Reset the admin/management password
  *
@@ -57,16 +56,6 @@ await import("../open-sse/utils/setupPolyfill.ts");
 // (paths already resolve via tsconfig) and when ROOT has no `src/` dir.
 const { registerAliasResolver } = await import("./aliasResolver.mjs");
 await registerAliasResolver(ROOT);
-
-// MCP stdio transport uses stdout exclusively for JSON-RPC messages.
-// Redirect console.log/warn to stderr early (before loadEnvFile and DB init)
-// so no startup output corrupts the protocol.
-if (process.argv.includes("--mcp")) {
-  const { Console } = await import("node:console");
-  const stderrConsole = new Console({ stdout: process.stderr, stderr: process.stderr });
-  console.log = stderrConsole.log.bind(stderrConsole);
-  console.warn = stderrConsole.warn.bind(stderrConsole);
-}
 
 // Electron persists secrets (JWT_SECRET, API_KEY_SECRET, STORAGE_ENCRYPTION_KEY) to
 // `<DATA_DIR>/server.env` (electron/main.js), never `.env`. Migrating an existing
@@ -252,17 +241,6 @@ process.on("exit", () => {
     });
   }
 });
-
-if (process.argv.includes("--mcp")) {
-  try {
-    const { startMcpCli } = await import(pathToFileURL(join(ROOT, "bin", "mcp-server.mjs")).href);
-    await startMcpCli(ROOT);
-  } catch (err) {
-    console.error("\x1b[31m✖ Failed to start MCP server:\x1b[0m", err.message || err);
-    process.exit(1);
-  }
-  process.exit(0);
-}
 
 if (process.argv.includes("reset-encrypted-columns")) {
   const { runResetEncryptedColumns } = await import(

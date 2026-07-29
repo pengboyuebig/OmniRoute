@@ -31,7 +31,6 @@ export type ClassificationReason =
   | "setup_wizard"
   | "public_connect_page"
   | "client_api_v1"
-  | "client_api_mcp"
   | "client_api_alias"
   | "client_api_codex_alias"
   | "client_api_double_prefix"

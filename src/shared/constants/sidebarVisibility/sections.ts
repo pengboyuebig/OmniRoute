@@ -237,55 +237,11 @@ const TOOLS_GROUP: SidebarItemGroup = {
       icon: "device_hub",
     },
     {
-      id: "cloud-agents",
-      href: "/dashboard/cloud-agents",
-      i18nKey: "cloudAgents",
-      subtitleKey: "cloudAgentsSubtitle",
-      icon: "cloud",
-    },
-    {
       id: "agent-bridge",
       href: "/dashboard/tools/agent-bridge",
       i18nKey: "agentBridge",
       subtitleKey: "agentBridgeSubtitle",
       icon: "link",
-    },
-    {
-      id: "traffic-inspector",
-      href: "/dashboard/tools/traffic-inspector",
-      i18nKey: "trafficInspector",
-      subtitleKey: "trafficInspectorSubtitle",
-      icon: "network_check",
-    },
-    {
-      id: "discovery",
-      href: "/dashboard/discovery",
-      i18nKey: "discovery",
-      subtitleKey: "discoverySubtitle",
-      icon: "travel_explore",
-    },
-  ],
-};
-
-const INTEGRATIONS_GROUP: SidebarItemGroup = {
-  type: "group",
-  id: "integrations",
-  titleKey: "integrationsGroup",
-  titleFallback: "Integrations",
-  items: [
-    {
-      id: "api-endpoints",
-      href: "/dashboard/api-endpoints",
-      i18nKey: "apiEndpoints",
-      subtitleKey: "apiEndpointsSubtitle",
-      icon: "api",
-    },
-    {
-      id: "webhooks",
-      href: "/dashboard/webhooks",
-      i18nKey: "webhooks",
-      subtitleKey: "webhooksSubtitle",
-      icon: "webhook",
     },
   ],
 };
@@ -342,28 +298,11 @@ const ANALYTICS_ITEMS: readonly SidebarItemDefinition[] = [
     icon: "manage_search",
   },
   {
-    id: "analytics-evals",
-    href: "/dashboard/analytics/evals",
-    i18nKey: "analyticsEvals",
-    subtitleKey: "analyticsEvalsSubtitle",
-    icon: "labs",
-  },
-  {
     id: "provider-stats",
     href: "/dashboard/provider-stats",
     i18nKey: "providerStats",
     subtitleKey: "providerStatsSubtitle",
     icon: "speed",
-  },
-];
-
-const MONITORING_ITEMS: readonly SidebarItemDefinition[] = [
-  {
-    id: "activity",
-    href: "/dashboard/activity",
-    i18nKey: "activity",
-    subtitleKey: "activitySubtitle",
-    icon: "timeline",
   },
 ];
 
@@ -400,29 +339,6 @@ const LOGS_GROUP: SidebarItemGroup = {
       i18nKey: "logsTimeline",
       subtitleKey: "logsTimelineSubtitle",
       icon: "view_timeline",
-    },
-  ],
-};
-
-const SYSTEM_GROUP: SidebarItemGroup = {
-  type: "group",
-  id: "system",
-  titleKey: "systemGroup",
-  titleFallback: "System",
-  items: [
-    {
-      id: "health",
-      href: "/dashboard/health",
-      i18nKey: "health",
-      subtitleKey: "healthSubtitle",
-      icon: "health_and_safety",
-    },
-    {
-      id: "runtime",
-      href: "/dashboard/runtime",
-      i18nKey: "runtime",
-      subtitleKey: "runtimeSubtitle",
-      icon: "bolt",
     },
   ],
 };
@@ -478,20 +394,6 @@ const AUDIT_GROUP: SidebarItemGroup = {
       subtitleKey: "auditLogSubtitle",
       icon: "policy",
     },
-    {
-      id: "audit-mcp",
-      href: "/dashboard/audit/mcp",
-      i18nKey: "auditMcp",
-      subtitleKey: "auditMcpSubtitle",
-      icon: "security",
-    },
-    {
-      id: "audit-a2a",
-      href: "/dashboard/audit/a2a",
-      i18nKey: "auditA2a",
-      subtitleKey: "auditA2aSubtitle",
-      icon: "device_hub",
-    },
   ],
 };
 
@@ -519,29 +421,7 @@ const DEVTOOLS_ITEMS: readonly SidebarItemDefinition[] = [
   },
 ];
 
-const MCP_ITEM: SidebarItemDefinition = {
-  id: "mcp",
-  href: "/dashboard/mcp",
-  i18nKey: "mcp",
-  subtitleKey: "mcpSubtitle",
-  icon: "hub",
-};
-
 const AGENTIC_FEATURES_ITEMS: readonly SidebarSectionChild[] = [
-  {
-    id: "memory",
-    href: "/dashboard/memory",
-    i18nKey: "memory",
-    subtitleKey: "memorySubtitle",
-    icon: "psychology",
-  },
-  {
-    id: "agent-skills",
-    href: "/dashboard/agent-skills",
-    i18nKey: "agentSkills",
-    subtitleKey: "agentSkillsSubtitle",
-    icon: "share",
-  },
   {
     id: "chaos-config",
     href: "/dashboard/chaos",
@@ -551,59 +431,7 @@ const AGENTIC_FEATURES_ITEMS: readonly SidebarSectionChild[] = [
     subtitleFallback: "Multi-model parallel execution",
     icon: "blender",
   },
-  {
-    id: "skills",
-    href: "/dashboard/omni-skills",
-    i18nKey: "omniSkills",
-    subtitleKey: "omniSkillsSubtitle",
-    icon: "auto_fix_high",
-  },
-  MCP_ITEM,
-  {
-    id: "a2a",
-    href: "/dashboard/a2a",
-    i18nKey: "a2a",
-    subtitleKey: "a2aSubtitle",
-    icon: "device_hub",
-  },
-  {
-    id: "plugins",
-    href: "/dashboard/plugins",
-    i18nKey: "plugins",
-    subtitleKey: "pluginsSubtitle",
-    icon: "extension",
-  },
 ];
-
-const GAMIFICATION_GROUP: SidebarItemGroup = {
-  type: "group",
-  id: "gamification",
-  titleKey: "gamificationGroup",
-  titleFallback: "Gamification",
-  items: [
-    {
-      id: "leaderboard",
-      href: "/dashboard/leaderboard",
-      i18nKey: "leaderboard",
-      subtitleKey: "leaderboardSubtitle",
-      icon: "emoji_events",
-    },
-    {
-      id: "profile",
-      href: "/dashboard/profile",
-      i18nKey: "profile",
-      subtitleKey: "profileSubtitle",
-      icon: "person",
-    },
-    {
-      id: "tokens",
-      href: "/dashboard/tokens",
-      i18nKey: "tokens",
-      subtitleKey: "tokensSubtitle",
-      icon: "toll",
-    },
-  ],
-};
 
 const OTHER_FEATURES_ITEMS: readonly SidebarItemDefinition[] = [
   {
@@ -717,6 +545,13 @@ const CONFIGURATION_ITEMS: readonly SidebarItemDefinition[] = [
     subtitleKey: "settingsSidebarSubtitle",
     icon: "view_sidebar",
   },
+  {
+    id: "tokens",
+    href: "/dashboard/tokens",
+    i18nKey: "tokens",
+    subtitleKey: "tokensSubtitle",
+    icon: "toll",
+  },
 ];
 
 const HELP_ITEMS: readonly SidebarItemDefinition[] = [
@@ -759,13 +594,7 @@ export const SIDEBAR_SECTIONS: readonly SidebarSectionDefinition[] = [
     id: "omni-proxy",
     titleKey: "omniProxySection",
     titleFallback: "OmniProxy",
-    children: [
-      ...OMNI_PROXY_ITEMS,
-      COMPRESSION_CONTEXT_GROUP,
-      TOOLS_GROUP,
-      INTEGRATIONS_GROUP,
-      PROXY_ITEM,
-    ],
+    children: [...OMNI_PROXY_ITEMS, COMPRESSION_CONTEXT_GROUP, TOOLS_GROUP, PROXY_ITEM],
   },
   {
     id: "analytics",
@@ -783,7 +612,7 @@ export const SIDEBAR_SECTIONS: readonly SidebarSectionDefinition[] = [
     id: "monitoring",
     titleKey: "monitoringSection",
     titleFallback: "Monitoring",
-    children: [...MONITORING_ITEMS, LOGS_GROUP, AUDIT_GROUP, SYSTEM_GROUP],
+    children: [LOGS_GROUP, AUDIT_GROUP],
   },
   {
     id: "devtools",
@@ -802,7 +631,7 @@ export const SIDEBAR_SECTIONS: readonly SidebarSectionDefinition[] = [
     id: "other-features",
     titleKey: "otherFeaturesSection",
     titleFallback: "Other Features",
-    children: [GAMIFICATION_GROUP, ...OTHER_FEATURES_ITEMS, BATCH_GROUP],
+    children: [...OTHER_FEATURES_ITEMS, BATCH_GROUP],
   },
   {
     id: "configuration",

@@ -103,15 +103,6 @@ async function startServer() {
     startupLog.info("Guardrail registry initialized");
     startupLog.info("Builtin skill handlers registered");
 
-    // Load active plugins on startup so they survive restarts
-    try {
-      const { pluginManager } = await import("./lib/plugins/manager");
-      await pluginManager.loadAll();
-      startupLog.info("Plugin manager loaded active plugins");
-    } catch (err) {
-      startupLog.warn({ err }, "Plugin manager loadAll failed (non-fatal)");
-    }
-
     await initializeCloudSync();
     startBudgetResetJob();
     startReasoningCacheCleanupJob();

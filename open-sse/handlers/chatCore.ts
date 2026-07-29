@@ -1,4 +1,3 @@
-import { injectMemoryAndSkills } from "./chatCore/memorySkillsInjection.ts";
 import { resolveChatCoreRequestSetup } from "./chatCore/requestSetup.ts";
 import { buildFailureUsageRecord } from "./chatCore/failureUsage.ts";
 import { extractSystemRoleMessages } from "./chatCore/claudeSystemRole.ts";
@@ -22,7 +21,6 @@ import { assembleStreamingPipeline } from "./chatCore/streamingPipeline.ts";
 import { sanitizeChatRequestBody } from "./chatCore/sanitization.ts";
 import {
   getHeaderValueCaseInsensitive,
-  isNoMemoryRequested,
   resolveCompressionHeader,
   isStripReasoningRequested,
 } from "./chatCore/headers.ts";
@@ -61,11 +59,6 @@ export {
   buildStreamingResponseHeaders,
   stripStaleForwardingHeaders,
 };
-import {
-  extractMemoryTextFromResponse,
-  extractMemoryTextFromRequestBody,
-  resolveMemoryOwnerId,
-} from "./chatCore/memoryExtraction.ts";
 import { CORS_HEADERS } from "../utils/cors.ts";
 import { checkHeapPressureGuard } from "../utils/heapPressure.ts";
 import { normalizeHeaders } from "../utils/headers.ts";
@@ -230,13 +223,10 @@ import {
   writeCompressionAnalytics,
   writeCompressionSkip,
 } from "./chatCore/compressionAnalyticsWrite.ts";
-import { runPluginOnRequestHook } from "./chatCore/pluginOnRequest.ts";
 import { recordContextEditingTelemetryHook } from "./chatCore/contextEditingTelemetry.ts";
 import { recordCompressionCacheStats } from "./chatCore/compressionCacheStats.ts";
 import { writeCavemanOutputAnalytics } from "./chatCore/cavemanOutputAnalytics.ts";
 import { scheduleQuotaShareConsumption } from "./chatCore/quotaShareConsumption.ts";
-import { emitRequestGamificationEvent } from "./chatCore/gamificationEvent.ts";
-import { runPluginOnResponseHook } from "./chatCore/pluginOnResponse.ts";
 import { scheduleStreamingQuotaShareConsumption } from "./chatCore/streamingQuotaShare.ts";
 import { recordStreamingUsageStats } from "./chatCore/streamingUsageStats.ts";
 import { recordStreamingCost } from "./chatCore/streamingCost.ts";
@@ -335,7 +325,6 @@ import {
 } from "../utils/aiSdkCompat.ts";
 import { generateRequestId } from "@/shared/utils/requestId";
 import { isLocalStreamLifecycleError } from "@/shared/utils/circuitBreaker";
-import { extractFacts } from "@/lib/memory/extraction";
 import { handleToolCallExecution } from "@/lib/skills/interception";
 import { OMNIROUTE_RESPONSE_HEADERS } from "@/shared/constants/headers";
 import { getClaudeCodeCompatibleRequestDefaults } from "@/lib/providers/requestDefaults";
@@ -480,33 +469,6 @@ export async function handleChatCore({
       body = injectCustomSystemPrompt(body as Record<string, unknown>, _s.customSystemPrompt);
       log?.debug?.("CUSTOMSP", "custom system prompt injected");
     }
-  }
-  // ── Plugin onRequest hook ──
-  // Dynamic import cached by Node.js after first call — minimal overhead
-  const pluginGate = await runPluginOnRequestHook({
-    requestId: traceId,
-    body,
-    model,
-    provider,
-    apiKeyInfo,
-    log,
-  });
-  if (pluginGate.blocked) {
-    return {
-      success: false,
-      status: 403,
-      // Label the source: this 403 is our own policy decision, not the provider
-      // rejecting us. Unlabelled, it is indistinguishable from a real upstream 403
-      // and gets the connection banned. Matches the type already sent to the client
-      // in pluginOnRequest.ts.
-      errorType: "plugin_block",
-      errorCode: "plugin_block",
-      error: "Request blocked by plugin",
-      response: pluginGate.response,
-    };
-  }
-  if (pluginGate.body) {
-    body = pluginGate.body;
   }
   // Per-API-key device/connection tracking (port of upstream 9router#931,
   // thanks @mugnimaestra). In-memory only, never blocks the request path.
@@ -1056,24 +1018,10 @@ export async function handleChatCore({
   }
 
   body = sanitizeChatRequestBody(body, sourceFormat, targetFormat);
-  // Per-request opt-out: clients that manage their own context send
-  // `x-omniroute-no-memory: true` to skip memory+skills injection (a null owner
-  // disables both branches in injectMemoryAndSkills). See PRD-2026-06-19-no-memory-header.
-  const memoryOwnerId = isNoMemoryRequested(clientRawRequest?.headers ?? null)
-    ? null
-    : resolveMemoryOwnerId(apiKeyInfo as Record<string, unknown> | null);
-  const injectionResult = await injectMemoryAndSkills({
-    body,
-    memoryOwnerId,
-    provider,
-    effectiveModel,
-    sourceFormat,
-    targetFormat,
-    backgroundReason,
-    log,
-  });
-  body = injectionResult.body;
-  const memorySettings = injectionResult.memorySettings;
+  // Memory + skills injection removed (non-core). Null owner/settings disable
+  // all downstream memory/skills guards and leave the request body untouched.
+  const memoryOwnerId = null as string | null;
+  const memorySettings = null as unknown as null;
 
   // Translate request (pass reqLogger for intermediate logging)
   // ── Proactive Context Compression (Phase 4) ──
@@ -2196,20 +2144,6 @@ export async function handleChatCore({
       );
     }
   } catch (error) {
-    // ── Plugin onError hook ──
-    try {
-      const { runOnError } = await import("@/lib/plugins/hooks");
-      await runOnError(
-        { requestId: traceId, body, model, provider, apiKeyInfo, metadata: {} },
-        error instanceof Error ? error : new Error(String(error))
-      );
-    } catch (pluginErr) {
-      log?.debug?.(
-        "PLUGIN",
-        `onError hook error (non-fatal): ${pluginErr instanceof Error ? pluginErr.message : String(pluginErr)}`
-      );
-    }
-
     const parsedStatus = Number(error?.statusCode);
     const statusCode =
       Number.isInteger(parsedStatus) && parsedStatus >= 400 && parsedStatus <= 599
@@ -4292,7 +4226,6 @@ export async function handleChatCore({
           responseToolNameMap
         )
       : responseBody;
-    const memoryExtractionResponse = translatedResponse;
 
     // T26: Strip markdown code blocks if provider format is Claude
     if (sourceFormat === "claude" && !stream) {
@@ -4367,18 +4300,6 @@ export async function handleChatCore({
     applyClientUsageBuffer(translatedResponse, body, clientResponseFormat, {
       preserveContextBudgetInVisibleUsage: isClaudeCodeCompatible,
     });
-
-    if (memoryOwnerId && memorySettings?.enabled && memorySettings.maxTokens > 0) {
-      const requestMemoryText = extractMemoryTextFromRequestBody(body as Record<string, unknown>);
-      if (requestMemoryText) {
-        extractFacts(requestMemoryText, memoryOwnerId, pipelineSessionId);
-      }
-
-      const memoryText = extractMemoryTextFromResponse(memoryExtractionResponse);
-      if (memoryText) {
-        extractFacts(memoryText, memoryOwnerId, pipelineSessionId);
-      }
-    }
 
     const customSkillExecutionEnabled =
       Boolean(memoryOwnerId) && memorySettings?.skillsEnabled === true;
@@ -4574,9 +4495,6 @@ export async function handleChatCore({
     });
     // === /Quota Share POST-hook ===
 
-    // ── Gamification event (fire-and-forget) ──
-    await emitRequestGamificationEvent({ apiKeyId: apiKeyInfo?.id, model, provider });
-
     finalizePendingScope(pendingScope, {
       providerResponse: responseBody,
       clientResponse: translatedResponse,
@@ -4600,19 +4518,6 @@ export async function handleChatCore({
     if (typeof model === "string" && model) echoModelInObject(translatedResponse, model);
     // #1311: echo the requested alias/combo name in the non-streaming response model.
     if (echoModel) echoModelInObject(translatedResponse, echoModel);
-
-    // ── Plugin onResponse hook (fire-and-forget) ──
-    // #8395: the streaming branch below already calls this; the non-streaming
-    // (stream:false) branch returned without it, so onResponse never fired for
-    // non-streaming requests at all.
-    await runPluginOnResponseHook({
-      requestId: traceId,
-      body,
-      model,
-      provider,
-      apiKeyInfo,
-      response: { status: 200, data: translatedResponse },
-    });
 
     return {
       success: true,
@@ -4853,25 +4758,6 @@ export async function handleChatCore({
     });
     // === /Quota Share POST-hook streaming ===
 
-    if (
-      memoryOwnerId &&
-      memorySettings?.enabled &&
-      memorySettings.maxTokens > 0 &&
-      streamStatus === 200
-    ) {
-      const requestMemoryText = extractMemoryTextFromRequestBody(body as Record<string, unknown>);
-      if (requestMemoryText) {
-        extractFacts(requestMemoryText, memoryOwnerId, pipelineSessionId);
-      }
-
-      const streamedMemoryText = extractMemoryTextFromResponse(
-        (streamResponseBody ?? null) as Record<string, unknown> | null
-      );
-      if (streamedMemoryText) {
-        extractFacts(streamedMemoryText, memoryOwnerId, pipelineSessionId);
-      }
-    }
-
     // Semantic cache: store assembled streaming response for future cache hits
     storeStreamingSemanticCacheResponse({
       enabled: semanticCacheEnabled,
@@ -4989,19 +4875,6 @@ export async function handleChatCore({
     clientResponseFormat,
     echoModel,
     responseHeaders,
-  });
-
-  // ── Gamification event (fire-and-forget) ──
-  await emitRequestGamificationEvent({ apiKeyId: apiKeyInfo?.id, model, provider });
-
-  // ── Plugin onResponse hook (fire-and-forget) ──
-  await runPluginOnResponseHook({
-    requestId: traceId,
-    body,
-    model,
-    provider,
-    apiKeyInfo,
-    response: { status: 200, streamed: true },
   });
 
   return {

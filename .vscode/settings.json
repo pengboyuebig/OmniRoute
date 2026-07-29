@@ -138,5 +138,13 @@
     "**/*-worktree-*": true,
     "**/*-issues-*": true,
     "**/*-reorg*": true
-  }
+  },
+  "i18n-ally.localesPaths": [
+    "docs/i18n",
+    "scripts/i18n",
+    "src/i18n",
+    "bin/cli/locales",
+    "src/i18n/messages",
+    "src/app/api/v1/messages"
+  ]
 }

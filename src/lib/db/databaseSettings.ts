@@ -46,7 +46,6 @@ const LEGACY_FLAT_KEYS: {
     quotaSnapshots: ["quotaSnapshots"],
     compressionAnalytics: ["compressionAnalytics"],
     mcpAudit: ["mcpAudit"],
-    a2aEvents: ["a2aEvents"],
     callLogs: ["callLogs"],
     usageHistory: ["usageHistory"],
     memoryEntries: ["memoryEntries"],
